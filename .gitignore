@@ -1,0 +1,15 @@
+/.idea/
+/.idea_modules/
+/target/
+/project/project/
+/project/target/
+/logs/
+/RUNNING_PID
+*.iml
+.DS_Store
+/.worksheet/bin/
+.project
+.classpath
+.cache
+/.settings
+/bin
