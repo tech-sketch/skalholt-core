@@ -30,7 +30,7 @@ abstract class AbstractScreens extends AbstractDao {
   }
 
   /** ID検索 */
-  def findById(screenId: String): ScreenRow = database.withTransaction { implicit session: Session =>
-    Screen.filter(_.screenId === screenId).first
+  def findById(screenId: String): Option[ScreenRow] = database.withTransaction { implicit session: Session =>
+    Screen.filter(_.screenId === screenId).firstOption
   }
 }

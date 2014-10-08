@@ -58,15 +58,12 @@ object GenerateForm extends App with LazyLogging {
     val screenActionList = ScreenActions.findByScreenId(screen.screenId)
     val pkgNm = screen.subsystemNmEn.get.toLowerCase
 
-    val params = screenItemList.map { case (screenItem, screen, domain) => GenUtil.createRows(screenItem, screen, domain) }
-
     def createMaps(screenItem: ScreenItemRow, screen: ScreenRow, domain: DomainRow) = {
       val (annotationCd, typeParam) = GenUtil.getTypeParam(domain)
       val typeName = GenUtil.getTypeName(screenItem, screen, annotationCd)
       val mapValue = GenUtil.addOptional(screenItem, screen, typeName + parenthesis(typeParam.map(p => s"${p.vname} = ${p.vvalue}").mkString(", ")))
-      Mappings(screenItem(4).get, mapValue)
+      Mappings(screenItem(4).get, screenItem(6).get,mapValue)
     }
-    val mappings: List[Mappings] = screenItemList.map { case (screenItem, screen, domain) => createMaps(screenItem, screen, domain) }
 
     val (entityImport, entityNm) = ScreenEntitys.filterByScreen(screen.screenId) match {
       case Some(se) => se.entityNmJa match {
@@ -97,14 +94,24 @@ object GenerateForm extends App with LazyLogging {
     val columnLength = allColumns.length
     val columns = allColumns.filter(!_.options.exists(o => o.toString.eq("AutoInc")))
     val keyColumns = allColumns.filter(_.options.exists(o => o.toString.eq("AutoInc")))
-    val paramsExcluded = params.filter(p => !keyColumns.exists(_.name.equalsIgnoreCase(p.pname)))
-    val mappingsExcluded = mappings.filter(p => !keyColumns.exists(_.name.equalsIgnoreCase(p.name)))
+
+    val mappings: List[Mappings] = screenItemList
+      .map { case (screenItem, screen, domain) => createMaps(screenItem, screen, domain) }
+    val params = screenItemList
+      .map { case (screenItem, screen, domain) => GenUtil.createRows(screenItem, screen, domain) }
+
+    val itemIsMatch = GenUtil.isMatch(allColumns, params)
+
+    val paramsExcluded = params
+      .filter(p => !allColumns.filter(_.options.exists(o => o.toString.eq("AutoInc"))).exists(_.name == decamelize(p.iname)))
+    val mappingsExcluded = mappings
+      .filter(p => !allColumns.filter(_.options.exists(o => o.toString.eq("AutoInc"))).exists(_.name == decamelize(p.iname)))
 
     val forms =
       if (screen.screenType == Some("Update"))
-        Forms(pkgNm, imports, GenUtil.nested(mappings), actionClassId, GenUtil.nested(params), entityNm, screen.screenType.get, allColumns.toList)
+        Forms(pkgNm, imports, GenUtil.nested(mappings), actionClassId, GenUtil.nested(params), entityNm, screen.screenType.get, allColumns.toList, itemIsMatch)
       else
-        Forms(pkgNm, imports, GenUtil.nested(mappingsExcluded), actionClassId, GenUtil.nested(paramsExcluded), entityNm, screen.screenType.get, allColumns.toList)
+        Forms(pkgNm, imports, GenUtil.nested(mappingsExcluded), actionClassId, GenUtil.nested(paramsExcluded), entityNm, screen.screenType.get, allColumns.toList, itemIsMatch)
 
     val str = formTemplate(forms)
 

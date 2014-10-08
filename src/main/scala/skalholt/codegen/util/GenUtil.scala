@@ -2,10 +2,12 @@ package skalholt.codegen.util
 
 import skalholt.codegen.database.common.Tables._
 import skalholt.codegen.database.AnnotationDefinitions
+import scala.slick.model.Column
+import skalholt.codegen.util.StringUtil._
 
-case class MethodParam(pname: String, ptype: String, pmaptype: String, searchConditionKb: Option[String])
+case class MethodParam(pname: String, iname: String, ptype: String, pmaptype: String, searchConditionKb: Option[String])
 case class VerifyParam(vname: String, vvalue: String)
-case class Row(pname: String, ptype: String, pmaptype: String, poptions: String, requireKbn: String)
+case class Row(pname: String, iname: String, ptype: String, pmaptype: String, poptions: String, requireKbn: String)
 
 object GenUtil {
 
@@ -47,7 +49,7 @@ object GenUtil {
       case Some("bigDecimal") => "String"
       case x => "String"
     }
-    MethodParam(screenItem(4).get, columnType, domain.dataType.get, screenItem(22))
+    MethodParam(screenItem(4).get, screenItem(6).get, columnType, domain.dataType.get, screenItem(22))
   }
 
   def createRows(screenItem: ScreenItemRow, screen: ScreenRow, domain: DomainRow) = {
@@ -75,7 +77,7 @@ object GenUtil {
       case _ => convOption("String", screenItem(15), screenItem(22))
     }
 
-    MethodParam(screenItem(4).get, componentType, dataType.getOrElse("text"), screenItem(22))
+    MethodParam(screenItem(4).get, screenItem(6).get, componentType, dataType.getOrElse("text"), screenItem(22))
   }
 
   def createRows(screenItem: ScreenItemRow, domain: DomainRow) = {
@@ -100,7 +102,7 @@ object GenUtil {
       case (Some("text"), g, d, r) => ("inputText", "")
       case _ => ("inputText", "")
     }
-    Row(screenItem(4).get, componentType, domain.dataType.get, options, screenItem(15).getOrElse("false"))
+    Row(screenItem(4).get, screenItem(6).get, componentType, domain.dataType.get, options, screenItem(15).getOrElse("false"))
   }
 
   def getTypeName(screenItem: ScreenItemRow, screen: ScreenRow, annotationCd: Option[String]) = {
@@ -210,5 +212,25 @@ object GenUtil {
     if (list.length <= 15) list :: Nil
     else list.splitAt(15) match { case (head, next) => head :: nested(next) }
   }
+
+  def isMatch(cols: Seq[Column], params: Seq[MethodParam]): Boolean =
+    if (params.map(p => decamelize(p.iname)) == cols.map(_.name)) false else !cols.zip(params).exists {
+      case (c, p) => (c.nullable, p.ptype) match {
+        case (false, x) if x.startsWith("Option[") && x.endsWith("]") => true
+        case (false, x) => false
+        case (true, x) if x.startsWith("Option[") && x.endsWith("]") => false
+        case (true, x) => true
+      }
+    }
+
+  def isRowMatch(cols: Seq[Column], params: Seq[Row]): Boolean =
+    if (params.map(p => decamelize(p.iname)) == cols.map(_.name)) false else !cols.zip(params).exists {
+      case (c, p) => (c.nullable, p.requireKbn) match {
+        case (false, x) if x == "true" => false
+        case (false, x) => true
+        case (true, x) if x == "true" => true
+        case (true, x) => false
+      }
+    }
 
 }

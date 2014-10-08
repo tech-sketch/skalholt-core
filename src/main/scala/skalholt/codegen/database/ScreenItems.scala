@@ -57,18 +57,24 @@ object ScreenItems extends AbstractScreenItems {
     q.list.map { case (screenItem, screen) => screenItem }
   }
 
-  def findByScreenIdWithAction(screenId: String) = database.withTransaction { implicit session: Session =>
+  def findByScreenIdWithAction(screenId: String): List[(ScreenItemRow, ScreenActionRow)] = database.withTransaction { implicit session: Session =>
 
     val q = (for (
       si <- ScreenItem if (si.screenId === screenId && si.searchresultFlag === "0");
-      sa <- ScreenAction if (si.screenId === sa.screenId && si.actionId === sa.actionId  && sa.actionNmEn.isNotNull)
+      sa <- ScreenAction if (si.screenId === sa.screenId && si.actionId === sa.actionId && sa.actionNmEn.isNotNull)
     ) yield (si, sa)).sortBy { case (screenItem, screenAction) => (screenItem.itemNo) }
 
-    q.list.map { case (screenItem, screenAction) => screenAction }
+    q.list
   }
 
   def truncate = {
     truncateTable("SCREEN_ITEM")
+  }
+
+  def findByActionId(screenId: String, actionId: String): Option[ScreenItemRow] = database.withTransaction { implicit session: Session =>
+
+    ScreenItem.filter(s => s.screenId === screenId && s.actionId === actionId).list.headOption
+
   }
 
 }

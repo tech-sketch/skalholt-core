@@ -4,10 +4,10 @@ import skalholt.codegen.util.StringUtil._
 import skalholt.codegen.util.Row
 import scala.slick.model.Column
 
-case class Link(pkgNm: String, fwAction: String, param: String, icon: String)
-case class Views(actionClassId: String, submitActionClassId: String, submitActionId: String, tableTitle: String, rows: List[Row], buttons: List[String], pkgNm: String, pkg: String, entityNm: String, columns: List[Column], resultItems: List[String])
+case class Action(bltype: String, value: String, pkgNm: String, fwAction: String, param: String, icon: String)
+case class Views(actionClassId: String, submitActionClassId: String, submitActionId: String, tableTitle: String, rows: List[Row], buttons: List[Action], pkgNm: String, pkg: String, entityNm: String, columns: List[Column], resultItems: (List[(String, String)], List[Action]), isMatch: Boolean)
 object ViewTemplate {
-  def searchTemplate(v: Views, links: List[Link]) =
+  def searchTemplate(v: Views) =
     s"""@(${decapitalize(v.actionClassId)}Form: Form[forms.${v.pkgNm.toLowerCase}.${capitalize(v.actionClassId)}Data], ${decapitalize(v.entityNm)}s: List[${v.pkg}.Tables.${capitalize(v.entityNm)}Row])(implicit flash: Flash)
 
 @import BootstrapHelper._
@@ -47,7 +47,7 @@ object ViewTemplate {
         ${if (v.rows.length > 5) """</div>""" else ""}
         <div align = "right">
           ${
-      v.buttons.map(button => s"""<input type="submit" value="${button}" class="btn btn-info">""").mkString("""
+      v.buttons.map(buttonOrLink).mkString("""
           """)
     }
         </div>
@@ -61,7 +61,7 @@ object ViewTemplate {
           <thead>
             <tr>
               ${
-      v.resultItems.map(r => s"""<th>${r}</th>""").mkString(s"""
+      v.resultItems._1.map { case (out, in) => s"""<th>${out}</th>""" }.mkString(s"""
               """)
     }
               <th>action</th>
@@ -71,14 +71,12 @@ object ViewTemplate {
             @for((${v.entityNm}) <- ${v.entityNm}s){
               <tr>
                 ${
-      v.resultItems.zipWithIndex.map { case (r, index) => s"""<td>@${if (v.rows.length > 22) s"${v.entityNm}(${index})" else s"${v.entityNm}.${r}"}</td>""" }.mkString(s"""
+      v.resultItems._1.zipWithIndex.map { case ((out, in), index) => s"""<td>@${if (v.rows.length > 22) s"${v.entityNm}(${index})" else s"${v.entityNm}.${in}"}</td>""" }.mkString(s"""
                 """)
     }
                 <td>${
-      links.map(l => s"""
-                  <a href="@controllers.${l.pkgNm.toLowerCase}.routes.${l.fwAction}(${l.param})">
-                    <i class="${l.icon}"></i>
-                  </a>""").mkString("")
+      v.resultItems._2.map(buttonOrLink).mkString("""
+          """)
     }
                 </td>
               </tr>
@@ -93,7 +91,7 @@ object ViewTemplate {
 }"""
 
   def createTemplate(v: Views) =
-    s"""@(${decapitalize(v.actionClassId)}Form: Form[${if (isMatch(v.columns, v.rows)) s"${v.pkg}.Tables.${capitalize(v.entityNm)}Row" else s"forms.${v.pkgNm.toLowerCase}.${capitalize(v.actionClassId)}Data"}])(implicit flash: Flash)
+    s"""@(${decapitalize(v.actionClassId)}Form: Form[${if (v.isMatch) s"${v.pkg}.Tables.${capitalize(v.entityNm)}Row" else s"forms.${v.pkgNm.toLowerCase}.${capitalize(v.actionClassId)}Data"}])(implicit flash: Flash)
 
 @import BootstrapHelper._
 
@@ -133,7 +131,7 @@ object ViewTemplate {
         ${if (v.rows.length > 5) """</div>""" else ""}
         <div align = "right">
           ${
-      v.buttons.map(button => s"""<input type="submit" value="${button}" class="btn btn-info">""").mkString("""
+      v.buttons.map(buttonOrLink).mkString("""
           """)
     }
         </div>
@@ -143,7 +141,7 @@ object ViewTemplate {
 }"""
 
   def updateTemplate(v: Views, param: String, paramNm: String) =
-    s"""@(${decapitalize(v.actionClassId)}Form: Form[${if (isMatch(v.columns, v.rows)) s"${v.pkg}.Tables.${capitalize(v.entityNm)}Row" else s"forms.${v.pkgNm.toLowerCase}.${capitalize(v.actionClassId)}Data"}], ${param})(implicit flash: Flash)
+    s"""@(${decapitalize(v.actionClassId)}Form: Form[${if (v.isMatch) s"${v.pkg}.Tables.${capitalize(v.entityNm)}Row" else s"forms.${v.pkgNm.toLowerCase}.${capitalize(v.actionClassId)}Data"}], ${param})(implicit flash: Flash)
 
 @import BootstrapHelper._
 
@@ -164,7 +162,11 @@ object ViewTemplate {
               """<div class="col-md-6">
           """
             else ""
-          }  @helper.${r.ptype}(${v.actionClassId}Form("${
+          }  ${
+              if(v.columns.filter(_.options.exists(o => o.toString.eq("AutoInc"))).exists(_.name == decamelize(r.iname)))
+                  s"""<input type = "hidden" id="${r.pname}" name ="${r.pname}" value="@${v.actionClassId}Form("${r.pname}").value">"""
+              else
+            	  s"""@helper.${r.ptype}(${v.actionClassId}Form("${
             if (v.rows.length > 22) s"""_${index / 15}.${r.pname}"), ${r.poptions}${
               if (r.poptions != "") "," else ""
             } '_label -> "${r.pname}""""
@@ -172,7 +174,7 @@ object ViewTemplate {
               if (r.poptions != "") s", ${r.poptions}"
               else ""
             }"""
-          })${
+          })"""}${
             if (v.rows.length > 5 && index % (v.rows.length / 2) == (v.rows.length / 2) - 1) """
           </div>"""
             else ""
@@ -182,7 +184,7 @@ object ViewTemplate {
     }
         ${if (v.rows.length > 5) """</div>""" else ""}
         ${
-      v.buttons.map(button => s"""<input type="submit" value="${button}" class="btn btn-info">""").mkString("""
+      v.buttons.map(buttonOrLink).mkString("""
           """)
     }
       </fieldset>
@@ -190,13 +192,10 @@ object ViewTemplate {
   }
 }"""
 
-  def isMatch(cols: Seq[Column], params: Seq[Row]): Boolean =
-    if (cols.length != params.length) false else !cols.zip(params).exists {
-      case (c, p) => (c.nullable, p.requireKbn) match {
-        case (false, x) if x == "true" => false
-        case (false, x) => true
-        case (true, x) if x == "true" => true
-        case (true, x) => false
-      }
-    }
+  def buttonOrLink(button: Action) = button.bltype match {
+    case typ if typ == "button" =>
+      s"""<input type="submit" value="${button.value}" class="btn btn-info">"""
+    case typ if typ == "link" =>
+      s"""<a href="@controllers.${button.pkgNm.toLowerCase}.routes.${button.fwAction}(${button.param})">${if (button.icon.isEmpty) button.value else "<i class=\"" + button.icon + "\"></i>"}</a>"""
+  }
 }

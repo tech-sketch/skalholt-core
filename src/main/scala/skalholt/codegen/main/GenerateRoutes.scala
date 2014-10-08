@@ -54,12 +54,15 @@ object GenerateRoutes extends App with LazyLogging {
     val param = keys.map { case (screenItem, screen, domain) => getColumnType(screenItem, domain) }.mkString(", ")
     val urlParam = keys.map(v => ":" + v._1(4).get).mkString("/")
 
-    def getRequest(actionNm: Option[String]) = {
-      actionNm match {
-        case Some("Delete") => "GET "
+    def getRequest(actionNm: Option[String], screenId: String, actionId: String) =
+      ScreenItems.findByActionId(screenId, actionId) match {
+        case Some(s) => s(8) match {
+          case Some("link") => "GET "
+          case _ => "POST"
+        }
         case _ => "POST"
       }
-    }
+
     def getActionPkgId(actionNm: Option[String]) = {
       actionNm match {
         case Some("Create") => "create/create/"
@@ -96,9 +99,14 @@ object GenerateRoutes extends App with LazyLogging {
 
     Route("GET ", pkgNm, getIndexActionPkgId(screen.screenType), actionClassId, getIndexActionId(screen.screenType)) ::
       screenActionList
-      .filter(f => (f.forwardScreenId == Some("myself"))
-        || (Screens.findById(f.screenId).useCaseNm == Screens.findById(f.forwardScreenId.get).useCaseNm))
-      .map(f => Route(getRequest(f.actionNmEn), pkgNm, getActionPkgId(f.actionNmEn), actionClassId, getActionId(f.actionNmEn)))
+      .filter { f =>
+        val compareUseCase: Boolean = (Screens.findById(f.screenId), Screens.findById(f.forwardScreenId.get)) match {
+          case (Some(cur), Some(fw)) => cur.useCaseNm == fw.useCaseNm
+          case _ => false
+        }
+        (f.forwardScreenId == Some("myself")) || compareUseCase
+      }
+      .map(f => Route(getRequest(f.actionNmEn, f.screenId, f.actionId), pkgNm, getActionPkgId(f.actionNmEn), actionClassId, getActionId(f.actionNmEn)))
   }
 
 }

@@ -83,15 +83,16 @@ object GenerateController extends App with LazyLogging {
             val allColumns = DBUtils.getColumns(jdbcDriver, url, schema, user, password)(entityNm)
             val columnLength = allColumns.length
             val keyColumns = allColumns.filter(_.options.exists(o => o.toString.eq("AutoInc")))
-            val rowsExcluded = rows.filter(p => !keyColumns.exists(_.name.equalsIgnoreCase(p.pname)))
+            val rowsExcluded = rows.filter(p => !keyColumns.exists(_.name == decamelize(p.iname)))
+            val itemIsMatch = GenUtil.isMatch(allColumns, rows)
 
             val parm = if (screen.screenType == Some("Update"))
-              Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rows, columns.toList)
+              Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rows, columns.toList, itemIsMatch)
             else
-              Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rowsExcluded, columns.toList)
+              Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rowsExcluded, columns.toList, itemIsMatch)
 
-            val parmExcluded = Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rowsExcluded, columns.toList)
-            val parmAll = Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rows, columns.toList)
+            val parmExcluded = Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rowsExcluded, columns.toList, itemIsMatch)
+            val parmAll = Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rows, columns.toList, itemIsMatch)
 
             val str = controllerTemplate(parm)
             FileUtil.createFile(str, folder + s"/app/controllers/$pkgNm", capitalize(screen.actionClassId.get) + ".scala", overrideController)

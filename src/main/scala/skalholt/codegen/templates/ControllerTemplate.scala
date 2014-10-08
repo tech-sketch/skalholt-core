@@ -5,7 +5,7 @@ import skalholt.codegen.util.StringUtil._
 import skalholt.codegen.util.MethodParam
 import skalholt.codegen.util.MethodParam
 
-case class Controllers(pkgNm: String, entityNm: String, actionClassId: String, actionNms: List[String], keys: List[MethodParam], tablePkg: String, rows: List[MethodParam], columns: List[Column])
+case class Controllers(pkgNm: String, entityNm: String, actionClassId: String, actionNms: List[String], keys: List[MethodParam], tablePkg: String, rows: List[MethodParam], columns: List[Column], isMatch: Boolean)
 object ControllerTemplate {
 
   /** Controller */
@@ -51,24 +51,26 @@ trait Index extends Controller with ${capitalize(c.actionClassId)}Form {
     IndexLogic.logic(${c.keys.map(p => s"${p.pname}").mkString(", ")}) match {
       case Some(${c.entityNm}) =>
         ${
-      if (isMatch(c.columns, c.rows))
+      if (c.isMatch)
         ""
       else
         s"val ${c.entityNm}Form = ${
           capitalize(c.actionClassId)
         }Data(${
-          c.rows.zip(c.columns).zipWithIndex.map {
-            case ((r, col), index) =>
-              if (c.columns.exists(col => decapitalize(camelize(col.name)) == r.pname))
+          c.rows.zipWithIndex.map {
+            case (r, index) => c.columns.filter(col => decapitalize(camelize(col.name)) == r.iname).headOption match {
+              case Some(col) =>
                 talbe2Form(col, r, s"${c.entityNm}${
-                  if (c.rows.length <= 15) s".${r.pname}"
+                  if (c.rows.length <= 15) s".${r.iname}"
                   else s"($index)"
                 }")
-              else "None"
+              case _ =>
+                "None"
+            }
           }.mkString(" ,")
         })"
     }
-        Ok(views.html.${c.pkgNm}.${c.actionClassId}(${c.actionClassId}Form.fill(${if (isMatch(c.columns, c.rows)) s"${c.entityNm}" else s"${c.entityNm}Form"}), ${c.keys.map(p => s"${p.pname}").mkString(", ")}))
+        Ok(views.html.${c.pkgNm}.${c.actionClassId}(${c.actionClassId}Form.fill(${if (c.isMatch) s"${c.entityNm}" else s"${c.entityNm}Form"}), ${c.keys.map(p => s"${p.pname}").mkString(", ")}))
       case _ =>
         BadRequest(views.html.${c.pkgNm}.${c.actionClassId}(
           ${c.actionClassId}Form.withGlobalError("No data found.").bindFromRequest, ${c.keys.map(p => s"${p.pname}").mkString(", ")}))
@@ -251,20 +253,20 @@ import play.api.mvc._
 import daos.${capitalize(c.entityNm)}s
 import models.Tables._
 import models.Tables.${capitalize(c.entityNm)}Row
-${if (isMatch(c.columns.filter(_.options.exists(o => o.toString.eq("AutoInc"))), c.rows)) "" else s"import forms.${c.pkgNm.toLowerCase}.${capitalize(c.actionClassId)}Data"}
+${if (c.isMatch) "" else s"import forms.${c.pkgNm.toLowerCase}.${capitalize(c.actionClassId)}Data"}
 
 object CreateLogic extends Controller {
 
-  def logic(${if (isMatch(c.columns.filter(_.options.exists(o => o.toString.eq("AutoInc"))), c.rows)) s"${c.entityNm}Row: ${capitalize(c.entityNm)}Row" else s"data: ${capitalize(c.actionClassId)}Data"})(implicit request: DBSessionRequest[AnyContent]): Int = {
+  def logic(${if (c.isMatch) s"${c.entityNm}Row: ${capitalize(c.entityNm)}Row" else s"data: ${capitalize(c.actionClassId)}Data"})(implicit request: DBSessionRequest[AnyContent]): Int = {
     ${
-      if (isMatch(c.columns.filter(_.options.exists(o => o.toString.eq("AutoInc"))), c.rows)) "" else s"val ${c.entityNm}Row = ${capitalize(c.entityNm)}Row(${
-        c.columns.zip(c.rows).map {
-          case (col, row) =>
+      if (c.isMatch) "" else s"val ${c.entityNm}Row = ${capitalize(c.entityNm)}Row(${
+        c.columns.map {
+          col =>
             if (col.options.exists(o => o.toString.eq("AutoInc"))) "0"
-            else if (c.rows.exists(r => decapitalize(camelize(col.name)) == r.pname))
-              form2Table(col, row, s"data.${decapitalize(camelize(col.name))}")
-            else
-              "None"
+            else c.rows.filter(_.iname == decapitalize(camelize(col.name))).headOption match {
+              case Some(row) => form2Table(col, row, s"data.${decapitalize(camelize(col.name))}")
+              case _ => "None"
+            }
         }.mkString(" ,")
       })"
     }
@@ -280,17 +282,18 @@ import play.api.db.slick._
 import play.api.mvc._
 import daos.${capitalize(c.entityNm)}s
 import models.Tables.${capitalize(c.entityNm)}Row
-${if (isMatch(c.columns, c.rows)) "" else s"import forms.${c.pkgNm.toLowerCase}.${capitalize(c.actionClassId)}Data"}
+${if (c.isMatch) "" else s"import forms.${c.pkgNm.toLowerCase}.${capitalize(c.actionClassId)}Data"}
 
 object UpdateLogic extends Controller {
-  def logic(${if (isMatch(c.columns, c.rows)) s"${c.entityNm}Row: ${capitalize(c.entityNm)}Row" else s"data: ${capitalize(c.actionClassId)}Data"})(implicit request: DBSessionRequest[AnyContent]): Int = {
+  def logic(${if (c.isMatch) s"${c.entityNm}Row: ${capitalize(c.entityNm)}Row" else s"data: ${capitalize(c.actionClassId)}Data"})(implicit request: DBSessionRequest[AnyContent]): Int = {
     ${
-      if (isMatch(c.columns, c.rows)) "" else s"val ${c.entityNm}Row = ${capitalize(c.entityNm)}Row(${
-        c.columns.zip(c.rows).map {
-          case (col, row) =>
-            if (c.rows.exists(r => decapitalize(camelize(col.name)) == r.pname) || col.options.exists(o => o.toString.eq("AutoInc")))
-              form2Table(col, row, s"data.${decapitalize(camelize(col.name))}")
-            else "None"
+      if (c.isMatch) "" else s"val ${c.entityNm}Row = ${capitalize(c.entityNm)}Row(${
+        c.columns.map {
+          col =>
+            c.rows.filter(_.iname == decapitalize(camelize(col.name))).headOption match {
+              case Some(row) => form2Table(col, row, s"data.${decapitalize(camelize(col.name))}")
+              case _ => "None"
+            }
         }.mkString(" ,")
       })"
     }
@@ -332,9 +335,13 @@ object DeleteLogic extends Controller {
   }
 }
 """
-
   def form2Table(col: Column, param: MethodParam, value: String): String =
     (col.nullable, param.ptype) match {
+      case (_, x) if x.isEmpty() => value
+      case (false, "Option[Date]")  => s"""${value}.getOrElse(utils.DateUtils.newSDate)"""
+      case (false, "Option[Int]")  => s"""${value}.getOrElse(0)"""
+      case (false, "Option[Long]")  => s"""${value}.getOrElse(0)"""
+      case (false, "Option[BigDecimal]")  => s"""${value}.getOrElse(0)"""
       case (false, x) if x.startsWith("Option[") && x.endsWith("]") => s"""${value}.getOrElse("")"""
       case (false, x) => value
       case (true, x) if x.startsWith("Option[") && x.endsWith("]") => value
@@ -343,20 +350,16 @@ object DeleteLogic extends Controller {
 
   def talbe2Form(col: Column, param: MethodParam, value: String): String =
     (col.nullable, param.ptype) match {
+      case (_, x) if x.isEmpty() => value
       case (false, x) if x.startsWith("Option[") && x.endsWith("]") => s"Some(${value})"
       case (false, x) => value
       case (true, x) if x.startsWith("Option[") && x.endsWith("]") => value
+      case (true, "Date") => s"""${value}.getOrElse(utils.DateUtils.newSDate)"""
+      case (true, "Int") => s"""${value}.getOrElse(0)"""
+      case (true, "Long") => s"""${value}.getOrElse(0)"""
+      case (true, "BigDecimal") => s"""${value}.getOrElse(0)"""
       case (true, x) => s"""${value}.getOrElse("")"""
     }
 
-  def isMatch(cols: Seq[Column], params: Seq[MethodParam]): Boolean =
-    if (cols.length != params.length) false else !cols.zip(params).exists {
-      case (c, p) => (c.nullable, p.ptype) match {
-        case (false, x) if x.startsWith("Option[") && x.endsWith("]") => true
-        case (false, x) => false
-        case (true, x) if x.startsWith("Option[") && x.endsWith("]") => false
-        case (true, x) => true
-      }
-    }
 }
 

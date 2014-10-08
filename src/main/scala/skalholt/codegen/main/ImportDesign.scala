@@ -83,10 +83,10 @@ object ImportDesign extends App with LazyLogging {
         //val itemNo = 1
         val columnNm = decapitalize(camelize(column.name))
         val itemNmJa = Some(columnNm)
-        val insideItemNmJa = Some("-")
+        val insideItemNmJa = Some(columnNm)
         val itemNmEn = itemNmJa
         val updatedItemNmEn = Some("-")
-        val insideItemNmEn = Some("-")
+        val insideItemNmEn = insideItemNmJa
         val updatedInsideItemNmEn = Some("-")
         val component = GenUtil.toComponent(column.tpe)
         val isPk = (table.primaryKey match {
@@ -122,10 +122,10 @@ object ImportDesign extends App with LazyLogging {
         if (screenType == Search) {
           val columnNmR = columnNm
           val itemNmJaR = Some(columnNmR)
-          val insideItemNmJaR = Some("-")
+          val insideItemNmJaR = itemNmJaR
           val itemNmEnR = itemNmJaR
           val updatedItemNmEnR = Some("-")
-          val insideItemNmEnR = Some("-")
+          val insideItemNmEnR = insideItemNmJaR
           val updatedInsideItemNmEnR = Some("-")
           val componentR = Some("label")
           val activeKbR = None

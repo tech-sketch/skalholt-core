@@ -8,7 +8,7 @@ import skalholt.codegen.database.AnnotationDefinitions
 import skalholt.codegen.util.StringUtil._
 import skalholt.codegen.util.{ FileUtil, GenUtil }
 import skalholt.codegen.constants.GenConstants._
-import skalholt.codegen.templates.{ Views, Link }
+import skalholt.codegen.templates.{ Views, Action }
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import skalholt.codegen.database.common.DBUtils
 
@@ -62,13 +62,14 @@ object GenerateView extends App with LazyLogging {
                     case Some(screenId) => (screenId, "index")
                     case _ => (screen.screenId, "index")
                   }
-                  (Screens.findById(submitScreenId).actionClassId.get,
+                  (Screens.findById(submitScreenId) match {
+                    case Some(x) => x.actionClassId.getOrElse("")
+                    case x => ""
+                  },
                     submitActionId)
                 case _ => (screen.screenId, "index")
 
               }
-
-            val buttons = ScreenItems.findByScreenIdWithAction(screen.screenId).map(_.actionNmEn.get)
 
             val tableTitle = screen.screenNm.get
             val entityNm = ScreenEntitys.findById(screen.screenId, 1).entityNmEn.get
@@ -93,7 +94,10 @@ object GenerateView extends App with LazyLogging {
 
             def getfwPkg(fwScreenId: Option[String]) = fwScreenId match {
               case Some("myself") => pkgNm
-              case Some(id) => Screens.findById(id).subsystemNmEn.getOrElse(pkgNm)
+              case Some(id) => Screens.findById(id) match {
+                case Some(x) => x.subsystemNmEn.getOrElse(pkgNm)
+                case x => pkgNm
+              }
               case _ => pkgNm
             }
 
@@ -111,38 +115,55 @@ object GenerateView extends App with LazyLogging {
                 case _ => ""
               }
             }
-            def getFoword(screenItem: ScreenItemRow) = {
+            def getAction(screenItem: ScreenItemRow): Action = {
               val screenAction = ScreenActions.findById(screen.screenId, screenItem(24).get)
-              Link(getfwPkg(screenAction.forwardScreenId),
+              val fwScreenType = screenAction.forwardScreenId match {
+                case Some("myself") => screen.screenType.getOrElse("")
+                case Some(screenId) => Screens.findById(screenId) match {
+                  case Some(s) => s.screenType.getOrElse("")
+                  case _ => ""
+                }
+                case screenId => ""
+              }
+
+              Action(screenItem(8).get, screenAction.actionNmEn.getOrElse(""), getfwPkg(screenAction.forwardScreenId),
                 getfwSctionId(screenAction.screenId, screenAction.actionNmEn.get, screenAction.forwardScreenId.get),
-                keys.zipWithIndex.map {
-                  case ((screenItem, screen, domain), index) =>
-                    (if (rows.length > 22) s"${entityNm}(${index})"
-                    else s"${entityNm}.${screenItem(4).get}") + (
-                      if (domain.dataType == Some("bigDecimal")) ".toString"
-                      else "")
-                }.mkString(", "),
+                if (screenAction.actionNmEn == Some("Update") || screenAction.actionNmEn == Some("Delete")) {
+                  keys.zipWithIndex.map {
+                    case ((fwScreenItem, screen, domain), index) =>
+                      if (screenItem(25) == Some("1")) {
+                        (if (rows.length > 22) s"${entityNm}(${index})"
+                        else s"${entityNm}.${fwScreenItem(6).get}") + (
+                          if (domain.dataType == Some("bigDecimal")) ".toString"
+                          else "")
+                      } else {
+                        if (domain.dataType == Some("text")) "" else "0"
+                      }
+                  }.mkString(", ")
+                } else "",
                 getIcon(screenAction.actionNmEn.get))
             }
+            val actions = ScreenItems.findByScreenIdWithAction(screen.screenId).map { case (item, action) => getAction(item) }
+            val resultActions = ScreenItems.getSearchResultActions(actionClassId, subsystemNmEn).map(getAction)
 
-            val actions = ScreenItems.getSearchResultActions(actionClassId, subsystemNmEn)
-            val tableLinkData = actions.map(getFoword)
+            println("links--" + resultActions)
 
-            val resultItems = ScreenItems.getSearchResultItems(actionClassId, subsystemNmEn).map(_(4).get)
+            val resultItems = (ScreenItems.getSearchResultItems(actionClassId, subsystemNmEn).map(r => (r(4).get, r(6).get)), resultActions)
 
             val allColumns = DBUtils.getColumns(jdbcDriver, url, schema, user, password)(entityNm)
             val columnLength = allColumns.length
             val columns = allColumns.filter(!_.options.exists(o => o.toString.eq("AutoInc")))
             val keyColumns = allColumns.filter(_.options.exists(o => o.toString.eq("AutoInc")))
-            val rowsExcluded = rows.filter(p => !keyColumns.exists(_.name.equalsIgnoreCase(p.pname)))
+            val rowsExcluded = rows.filter(p => !keyColumns.exists(_.name == decamelize(p.iname)))
+            val itemIsMatch = GenUtil.isRowMatch(allColumns, rows)
 
             val views =
               if (screen.screenType == Some("Update"))
-                Views(actionClassId, submitActionClassId, submitActionId, tableTitle, rows, buttons, pkgNm, tablesPkg, entityNm, allColumns.toList, resultItems)
+                Views(actionClassId, submitActionClassId, submitActionId, tableTitle, rows, actions, pkgNm, tablesPkg, entityNm, allColumns.toList, resultItems, itemIsMatch)
               else
-                Views(actionClassId, submitActionClassId, submitActionId, tableTitle, rowsExcluded, buttons, pkgNm, tablesPkg, entityNm, allColumns.toList, resultItems)
+                Views(actionClassId, submitActionClassId, submitActionId, tableTitle, rowsExcluded, actions, pkgNm, tablesPkg, entityNm, allColumns.toList, resultItems, itemIsMatch)
             val str = screen.screenType match {
-              case Some("Search") => searchTemplate(views, tableLinkData)
+              case Some("Search") => searchTemplate(views)
               case Some("Create") => createTemplate(views)
               case Some("Update") => updateTemplate(views, param, paramNm)
               case _ => "no template"
