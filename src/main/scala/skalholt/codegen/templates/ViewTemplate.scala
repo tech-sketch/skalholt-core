@@ -183,10 +183,12 @@ object ViewTemplate {
           """)
     }
         ${if (v.rows.length > 5) """</div>""" else ""}
+        <div align = "right">
         ${
       v.buttons.map(buttonOrLink).mkString("""
           """)
     }
+        </div>
       </fieldset>
     </div>
   }
