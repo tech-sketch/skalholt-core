@@ -4,7 +4,9 @@ The code generator for Play Framework and Slick.
 
 # Release Notes
 
-- 2014/09/5 ver.0.1.0
+- 02/23/2015 ver.0.1.2
+- 10/15/2014 ver.0.1.1
+- 09/05/2014 ver.0.1.0
 
 # Generator features
 
@@ -18,7 +20,7 @@ The code generator for Play Framework and Slick.
 
 Please send feedback to us.
 
-[TIS Inc.](http://www.tis.co.jp)
+[TIS Inc.](http://www.tis.com/)
 Strategic Technology Center
 Skalholt team
 <smart_dev@ml.tis.co.jp>.
