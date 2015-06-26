@@ -13,7 +13,7 @@ object GenConstants extends LazyLogging {
   val bizUrl = config.getString("dbbiz.url")
   val bizCatalog = config.getString("dbbiz.catalog")
   val bizSchema = config.getString("dbbiz.schema")
-  val bizUser = config.getString("dbbiz.user")
+  val bizUser = config.getString("dbbiz.username")
   val bizPassword = config.getString("dbbiz.password")
 
   // Generator Schema
@@ -21,7 +21,7 @@ object GenConstants extends LazyLogging {
   val genDriver = config.getString("db.gen.driver")
   val genUrl = config.getString("db.gen.url")
   val genSchema = config.getString("db.gen.schema")
-  val genUser = config.getString("db.gen.user")
+  val genUser = config.getString("db.gen.username")
   val genPassword = config.getString("db.gen.password")
 
   // Generator Setting
@@ -83,7 +83,7 @@ object GenConstants extends LazyLogging {
     bizSlickDriver: Option[String] = Some(config.getString("dbbiz.slickDriver")),
     bizJdbcDriver: Option[String] = Some(config.getString("dbbiz.jdbcDriver")),
     bizUrl: Option[String] = Some(config.getString("dbbiz.url")),
-    bizUser: Option[String] = Some(config.getString("dbbiz.user")),
+    bizUser: Option[String] = Some(config.getString("dbbiz.username")),
     bizPassword: Option[String] = Some(config.getString("dbbiz.password")),
     bizSchema: Option[String] = Some(config.getString("dbbiz.schema")),
     bizCatalog: Option[String] = Some(config.getString("dbbiz.catalog")),
