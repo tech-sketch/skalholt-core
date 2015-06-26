@@ -1,50 +1,45 @@
 package skalholt.codegen.database.common
 
-import scala.slick.jdbc.meta.{ createModel, MTable }
-import scala.slick.driver.JdbcDriver
-import scala.slick.driver.JdbcDriver.backend.DatabaseDef
-import scala.slick.model.{ Column, Table }
+import skalholt.codegen.util.StringUtil
+import slick.jdbc.meta.MTable
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
+import scala.concurrent.ExecutionContext.Implicits.global
+import slick.model.Column
 import skalholt.codegen.util.StringUtil._
-import skalholt.codegen.database.common.Tables._
-import skalholt.codegen.database.common.BaseDatabase.profile.simple._
+import slick.driver.H2Driver.api._
 import skalholt.codegen.constants.GenConstants._
 import com.typesafe.scalalogging.slf4j.LazyLogging
+import slick.jdbc.JdbcModelBuilder
 
 object DBUtils extends AbstractDao with LazyLogging {
 
-  def getModel(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String]) = {
+  def getTables(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String]) = {
 
     val db =
       if (!user.isEmpty)
-        JdbcDriver.simple.Database.forURL(url, driver = jdbcDriver, user = user.get, password = password.getOrElse(""))
+        Database.forURL(url, driver = jdbcDriver, user = user.get, password = password.getOrElse(""))
       else
-        JdbcDriver.simple.Database.forURL(url, driver = jdbcDriver)
+        Database.forURL(url, driver = jdbcDriver)
 
-    db.withSession { implicit session =>
-      val tables = MTable.getTables(None, Some(schema), None, None).list.filter(t => !ignoreTables.exists(_.equalsIgnoreCase(t.name.name)))
-        .filter(t => (!t.name.name.endsWith("_pkey") && !t.name.name.endsWith("_seq")))
-
-      logger.info("----- tables -----")
-      tables.zipWithIndex.foreach { case (table, index) => logger.info(s"${f"${index + 1}% 4d"}.${table.name.name}") }
-      logger.info("----- tables -----")
-
-      createModel(tables, JdbcDriver)
-    }
+    val tablesA = MTable.getTables(None, Some(schema), None, None)
+    Await.result(db.run(tablesA), Duration.Inf)
+      .filter(t => !ignoreTables.exists(_.equalsIgnoreCase(t.name.name)))
+      .filter(t => (!t.name.name.endsWith("_pkey") && !t.name.name.endsWith("_seq")))
   }
 
-  def getTable(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String])(tableNm: String): Option[Table] =
-    getModel(jdbcDriver, url, schema, user, password).tables.find(_.name.table.equalsIgnoreCase(decamelize(tableNm)))
+  def getModel(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String]) = {
+    val tables = getTables(jdbcDriver, url, schema, user, password)
+    val modelBuilder = (new JdbcModelBuilder(tables, false)).buildModel
+    Await.result(db.run(modelBuilder), Duration.Inf)
+  }
+
+  def getTable(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String])(tableNm: String): Option[MTable] =
+    getTables(jdbcDriver, url, schema, user, password).find(t => t.name.name.equalsIgnoreCase(decamelize(tableNm)))
 
   def getColumnLength(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String])(tableNm: String): Int =
-    getTable(jdbcDriver, url, schema, user, password)(tableNm) match {
-      case Some(t) => t.columns.length
-      case _ => 0
-    }
+    (getColumns(jdbcDriver, url, schema, user, password)(tableNm: String)).length
 
   def getColumns(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String])(tableNm: String): Seq[Column] =
-    getTable(jdbcDriver, url, schema, user, password)(tableNm) match {
-      case Some(t) => t.columns
-      case _ => Seq.empty[Column]
-    }
-
+    getModel(jdbcDriver, url, schema, user, password).tables.filter(t => t.name.table == StringUtil.decamelize(tableNm)).head.columns
 }

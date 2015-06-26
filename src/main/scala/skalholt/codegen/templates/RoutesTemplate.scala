@@ -2,9 +2,9 @@ package skalholt.codegen.templates
 
 import skalholt.codegen.util.StringUtil._
 
-case class Route(request: String, pkgNm: String, actionPkgId: String, actionClassId: String, actionId: String)
+case class  Route(request: String, pkgNm: String, actionPkgId: String, actionClassId: String, actionId: String)
 object RoutesTemplate {
-  val routesTemplate = (routesList: List[Route]) =>
+  val routesTemplate = (routesList: Seq[Route]) =>
     s"""# Routes
 # This file defines all application routes (Higher priority routes first)
 # ~~~~

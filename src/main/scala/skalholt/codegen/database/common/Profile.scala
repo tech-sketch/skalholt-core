@@ -1,6 +1,6 @@
 package skalholt.codegen.database.common
 
-import scala.slick.driver.JdbcDriver
+import slick.driver.JdbcDriver
 import skalholt.codegen.constants.GenConstants._
 import com.typesafe.scalalogging.slf4j.LazyLogging
 

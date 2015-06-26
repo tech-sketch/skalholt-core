@@ -1,23 +1,24 @@
 package skalholt.codegen.main
 
-import skalholt.codegen.database.{ Screens, ScreenItems, ScreenActions, ScreenEntitys }
+import skalholt.codegen.database.{Screens, ScreenItems, ScreenEntitys}
 import skalholt.codegen.util.StringUtil._
-import skalholt.codegen.templates.FormTemplate._
 import skalholt.codegen.util.FileUtil
 import skalholt.codegen.constants.GenConstants._
-import skalholt.codegen.database.common.Tables.{ ScreenRow, ScreenItemRow, DomainRow }
+import skalholt.codegen.database.common.Tables.{ScreenRow, ScreenItemRow, DomainRow}
 import skalholt.codegen.templates._
 import skalholt.codegen.templates.FormTemplate._
 import skalholt.codegen.util.GenUtil
-import scala.collection.immutable.Nil
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import skalholt.codegen.database.common.DBUtils
+
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 object GenerateForm extends App with LazyLogging {
 
   logger.info("start GenerateForm")
-
-  require(ScreenItems.getScreenItemCount > 0, "出力対象の画面設計書項目が存在しません。")
+  require(Await.result(ScreenItems.getScreenItemCount, Duration.Inf) > 0,
+    "出力対象の画面設計書項目が存在しません。")
 
   // Formのジェネレート
   val Array(slickDriver, jdbcDriver, url, catalog, schema, folder, tablesPkg, _*) =
@@ -36,8 +37,7 @@ object GenerateForm extends App with LazyLogging {
   val (user, password) = if (args.size > 7) (Some(args(7)), Some(args(8))) else (None, None)
 
   // 処理対象のデータリスト(ACTION_CLASS_ID/SCREEN_ID)を取得
-  val actionClassIdList = Screens.find()
-  actionClassIdList.foreach {
+  Await.result(Screens.find(), Duration.Inf).foreach {
     case (Some(actionClassId), Some(subsystemNmEn)) => generateForm(jdbcDriver, url, schema, user, password)(folder, actionClassId, subsystemNmEn, tablesPkg)
     case _ =>
   }
@@ -46,32 +46,31 @@ object GenerateForm extends App with LazyLogging {
 
   private def generateForm(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String])(folder: String, actionClassId: String, subsystemNmEn: String, tablesPkg: String) = {
 
-    val screenItemList =
-      ScreenItems.findWithScreenAndDomain(actionClassId, subsystemNmEn);
+    val screenItemList = Await.result(ScreenItems.findWithScreenAndDomain(actionClassId, subsystemNmEn), Duration.Inf)
+    require(screenItemList.size > 0, "ユースケース[" + actionClassId + "]の項目定義が存在しません。画面設計書を確認してください。")
 
-    require(screenItemList.size > 0, "ユースケース[" + actionClassId +
-      "]の項目定義が存在しません。画面設計書を確認してください。")
 
-    val screen = Screens.findByActionClassIdAndSubsystem(actionClassId, subsystemNmEn).head
+    val screens = Await.result(Screens.findByActionClassIdAndSubsystem(actionClassId, subsystemNmEn), Duration.Inf)
+    val screen = screens.head
     require(screen != null, "ユースケースに対応する画面情報が存在しません。")
 
-    val screenActionList = ScreenActions.findByScreenId(screen.screenId)
     val pkgNm = screen.subsystemNmEn.get.toLowerCase
 
     def createMaps(screenItem: ScreenItemRow, screen: ScreenRow, domain: DomainRow) = {
       val (annotationCd, typeParam) = GenUtil.getTypeParam(domain)
       val typeName = GenUtil.getTypeName(screenItem, screen, annotationCd)
       val mapValue = GenUtil.addOptional(screenItem, screen, typeName + parenthesis(typeParam.map(p => s"${p.vname} = ${p.vvalue}").mkString(", ")))
-      Mappings(screenItem(4).get, screenItem(6).get,mapValue)
+      Mappings(screenItem(4).get, screenItem(6).get, mapValue)
     }
 
-    val (entityImport, entityNm) = ScreenEntitys.filterByScreen(screen.screenId) match {
-      case Some(se) => se.entityNmJa match {
-        case Some(entity) => (List(s"import ${tablesPkg}.Tables.${capitalize(entity)}Row"), entity)
+    val (entityImport, entityNm) =
+      Await.result(ScreenEntitys.filterByScreen(screen.screenId), Duration.Inf) match {
+        case Some(se) => se.entityNmJa match {
+          case Some(entity) => (List(s"import ${tablesPkg}.Tables.${capitalize(entity)}Row"), entity)
+          case _ => (List.empty, "")
+        }
         case _ => (List.empty, "")
       }
-      case _ => (List.empty, "")
-    }
 
     val sqlImport =
       if (screenItemList.exists {
@@ -95,7 +94,7 @@ object GenerateForm extends App with LazyLogging {
     val columns = allColumns.filter(!_.options.exists(o => o.toString.eq("AutoInc")))
     val keyColumns = allColumns.filter(_.options.exists(o => o.toString.eq("AutoInc")))
 
-    val mappings: List[Mappings] = screenItemList
+    val mappings: Seq[Mappings] = screenItemList
       .map { case (screenItem, screen, domain) => createMaps(screenItem, screen, domain) }
     val params = screenItemList
       .map { case (screenItem, screen, domain) => GenUtil.createRows(screenItem, screen, domain) }

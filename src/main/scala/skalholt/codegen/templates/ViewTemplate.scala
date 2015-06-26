@@ -2,13 +2,13 @@ package skalholt.codegen.templates
 
 import skalholt.codegen.util.StringUtil._
 import skalholt.codegen.util.Row
-import scala.slick.model.Column
+import slick.model.Column
 
 case class Action(bltype: String, value: String, pkgNm: String, fwAction: String, param: String, icon: String)
-case class Views(actionClassId: String, submitActionClassId: String, submitActionId: String, tableTitle: String, rows: List[Row], buttons: List[Action], pkgNm: String, pkg: String, entityNm: String, columns: List[Column], resultItems: (List[(String, String)], List[Action]), isMatch: Boolean)
+case class Views(actionClassId: String, submitActionClassId: String, submitActionId: String, tableTitle: String, rows: Seq[Row], buttons: Seq[Action], pkgNm: String, pkg: String, entityNm: String, columns: Seq[Column], resultItems: (Seq[(String, String)], Seq[Action]), isMatch: Boolean)
 object ViewTemplate {
   def searchTemplate(v: Views) =
-    s"""@(${decapitalize(v.actionClassId)}Form: Form[forms.${v.pkgNm.toLowerCase}.${capitalize(v.actionClassId)}Data], ${decapitalize(v.entityNm)}s: List[${v.pkg}.Tables.${capitalize(v.entityNm)}Row])(implicit flash: Flash)
+    s"""@(${decapitalize(v.actionClassId)}Form: Form[forms.${v.pkgNm.toLowerCase}.${capitalize(v.actionClassId)}Data], ${decapitalize(v.entityNm)}s: Seq[${v.pkg}.Tables.${capitalize(v.entityNm)}Row])(implicit flash: Flash, messages: Messages)
 
 @import BootstrapHelper._
 
@@ -91,7 +91,7 @@ object ViewTemplate {
 }"""
 
   def createTemplate(v: Views) =
-    s"""@(${decapitalize(v.actionClassId)}Form: Form[${if (v.isMatch) s"${v.pkg}.Tables.${capitalize(v.entityNm)}Row" else s"forms.${v.pkgNm.toLowerCase}.${capitalize(v.actionClassId)}Data"}])(implicit flash: Flash)
+    s"""@(${decapitalize(v.actionClassId)}Form: Form[${if (v.isMatch) s"${v.pkg}.Tables.${capitalize(v.entityNm)}Row" else s"forms.${v.pkgNm.toLowerCase}.${capitalize(v.actionClassId)}Data"}])(implicit flash: Flash, messages: Messages)
 
 @import BootstrapHelper._
 
@@ -141,7 +141,7 @@ object ViewTemplate {
 }"""
 
   def updateTemplate(v: Views, param: String, paramNm: String) =
-    s"""@(${decapitalize(v.actionClassId)}Form: Form[${if (v.isMatch) s"${v.pkg}.Tables.${capitalize(v.entityNm)}Row" else s"forms.${v.pkgNm.toLowerCase}.${capitalize(v.actionClassId)}Data"}], ${param})(implicit flash: Flash)
+    s"""@(${decapitalize(v.actionClassId)}Form: Form[${if (v.isMatch) s"${v.pkg}.Tables.${capitalize(v.entityNm)}Row" else s"forms.${v.pkgNm.toLowerCase}.${capitalize(v.actionClassId)}Data"}], ${param})(implicit flash: Flash, messages: Messages)
 
 @import BootstrapHelper._
 

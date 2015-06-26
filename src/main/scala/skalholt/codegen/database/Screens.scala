@@ -1,18 +1,22 @@
 package skalholt.codegen.database
 
 import skalholt.codegen.database.common.Tables._
-import skalholt.codegen.database.common.BaseDatabase.profile.simple._
+import slick.driver.H2Driver.api._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 object Screens extends AbstractScreens {
 
+  def truncate = truncateTable("SCREEN")
+
   /** 検索 */
-  def find(): List[(Option[String], Option[String])] = database.withTransaction { implicit session: Session =>
+  def find(): Future[Seq[(Option[String], Option[String])]] = {
     val q = (for {
       ((actionClassId, subsystemNmEn), ss) <- Screen.groupBy(s => (s.actionClassId, s.subsystemNmEn))
     } yield (actionClassId, subsystemNmEn))
       .sortBy { case (actionClassId, subsystemNmEn) => (subsystemNmEn, actionClassId) }
 
-    q.list
+    db.run(q.result)
   }
 
   /**
@@ -22,12 +26,9 @@ object Screens extends AbstractScreens {
    * @param subsystemNmEn サブシステム(英名)
    * @return エンティティのリスト
    */
-  def findByActionClassIdAndSubsystem(actionClassId: String, subsystemNmEn: String): List[ScreenRow] = database.withTransaction { implicit session: Session =>
-    Screen.filter(v => (v.actionClassId === actionClassId && v.subsystemNmEn === subsystemNmEn)).sortBy(_.screenRbn).list
-  }
-
-  def truncate = {
-    truncateTable("SCREEN")
+  def findByActionClassIdAndSubsystem(actionClassId: String, subsystemNmEn: String): Future[Seq[ScreenRow]] = {
+    val q = Screen.filter(v => (v.actionClassId === actionClassId && v.subsystemNmEn === subsystemNmEn)).sortBy(_.screenRbn)
+    db.run(q.result)
   }
 
 }

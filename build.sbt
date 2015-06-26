@@ -1,8 +1,8 @@
 name := """skalholt-core"""
 
-version := "0.1.2"
+version := "0.1.3"
 
-scalaVersion := "2.11.5"
+scalaVersion := "2.11.7"
 
 organization := "skalholt"
 
@@ -11,8 +11,8 @@ mainClass in Compile := Some("Skalholt")
 resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
 
 libraryDependencies ++= List(
-  "com.typesafe.slick" %% "slick" % "2.1.0",
-  "com.typesafe.slick" %% "slick-codegen" % "2.1.0",
+  "com.typesafe.slick" %% "slick" % "3.0.0",
+  "com.typesafe.slick" %% "slick-codegen" % "3.0.0",
   "com.h2database" % "h2" % "1.3.176",
   "postgresql" % "postgresql" % "9.1-901.jdbc4",
   "org.scalatest" %% "scalatest" % "2.2.4" % "test",
@@ -21,5 +21,5 @@ libraryDependencies ++= List(
   "com.typesafe.scala-logging" %% "scala-logging-slf4j" % "2.1.2",
   "org.slf4j" % "slf4j-api" % "1.7.10",
   "ch.qos.logback" % "logback-classic" % "1.1.2",
-   "com.typesafe.akka" %% "akka-actor" % "2.3.4"
+   "com.typesafe.akka" %% "akka-actor" % "2.3.9"
 )

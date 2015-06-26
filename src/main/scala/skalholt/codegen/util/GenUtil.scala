@@ -2,8 +2,12 @@ package skalholt.codegen.util
 
 import skalholt.codegen.database.common.Tables._
 import skalholt.codegen.database.AnnotationDefinitions
-import scala.slick.model.Column
+import slick.model.Column
 import skalholt.codegen.util.StringUtil._
+
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
+import scala.util.{Failure, Success}
 
 case class MethodParam(pname: String, iname: String, ptype: String, pmaptype: String, searchConditionKb: Option[String])
 case class VerifyParam(vname: String, vvalue: String)
@@ -34,20 +38,17 @@ object GenUtil {
   }
 
   def getColumnType(implicit screenItem: ScreenItemRow, domain: DomainRow) = {
-    val dataType = AnnotationDefinitions.filterByDomainCd(domain.domainCd) match {
-      case Some(ad) => Some(ad.annotationCd)
-      case _ => None
-    }
+    val dataType = Await.result(AnnotationDefinitions.filterByDomainCd(domain.domainCd), Duration.Inf).annotationCd
 
     val columnType = dataType match {
-      case Some("text") => "String"
-      case Some("sqlDate") => "java.sql.Date"
-      case Some("sqlTimestamp") => "java.sql.Date"
-      case Some("number") => "Int"
-      case Some("smalInt") => "Short"
-      case Some("longNumber") => "Long"
-      case Some("bigDecimal") => "String"
-      case x => "String"
+      case "text" => "String"
+      case "sqlDate" => "java.sql.Date"
+      case "sqlTimestamp" => "java.sql.Date"
+      case "number" => "Int"
+      case "smalInt" => "Short"
+      case "longNumber" => "Long"
+      case "bigDecimal" => "String"
+      case _ => "String"
     }
     MethodParam(screenItem(4).get, screenItem(6).get, columnType, domain.dataType.get, screenItem(22))
   }
@@ -61,23 +62,20 @@ object GenUtil {
         case (_, _, _) => s"Option[$compType]"
       }
     }
-    val dataType = AnnotationDefinitions.filterByDomainCd(domain.domainCd) match {
-      case Some(ad) => Some(ad.annotationCd)
-      case _ => None
-    }
 
+    val dataType = Await.result(AnnotationDefinitions.filterByDomainCd(domain.domainCd), Duration.Inf).annotationCd
     val componentType = dataType match {
-      case Some("text") => convOption("String", screenItem(15), screenItem(22))
-      case Some("sqlDate") => convOption("Date", screenItem(15), screenItem(22))
-      case Some("sqlTimestamp") => convOption("Date", screenItem(15), screenItem(22))
-      case Some("number") => convOption("Int", screenItem(15), screenItem(22))
-      case Some("smalInt") => convOption("Int", screenItem(15), screenItem(22))
-      case Some("longNumber") => convOption("Long", screenItem(15), screenItem(22))
-      case Some("bigDecimal") => convOption("BigDecimal", screenItem(15), screenItem(22))
+      case "text" => convOption("String", screenItem(15), screenItem(22))
+      case "sqlDate" => convOption("Date", screenItem(15), screenItem(22))
+      case "sqlTimestamp" => convOption("Date", screenItem(15), screenItem(22))
+      case "number" => convOption("Int", screenItem(15), screenItem(22))
+      case "smalInt" => convOption("Int", screenItem(15), screenItem(22))
+      case "longNumber" => convOption("Long", screenItem(15), screenItem(22))
+      case "bigDecimal" => convOption("BigDecimal", screenItem(15), screenItem(22))
       case _ => convOption("String", screenItem(15), screenItem(22))
     }
 
-    MethodParam(screenItem(4).get, screenItem(6).get, componentType, dataType.getOrElse("text"), screenItem(22))
+    MethodParam(screenItem(4).get, screenItem(6).get, componentType, dataType, screenItem(22))
   }
 
   def createRows(screenItem: ScreenItemRow, domain: DomainRow) = {
@@ -139,7 +137,7 @@ object GenUtil {
   }
 
   def getTypeParam(domain: DomainRow) = {
-    val annotationList = AnnotationDefinitions.getAnnotationList(domain.domainCd)
+    val annotationList = Await.result(AnnotationDefinitions.getAnnotationList(domain.domainCd), Duration.Inf)
     val argList = annotationList.headOption match {
       case Some((ad, a)) =>
         val anvalue = getValue(a.annotationCd)_
@@ -208,9 +206,9 @@ object GenUtil {
     }
   }
 
-  def nested[A](list: List[A]): List[List[A]] = {
-    if (list.length <= 15) list :: Nil
-    else list.splitAt(15) match { case (head, next) => head :: nested(next) }
+  def nested[A](seq: Seq[A]): Seq[Seq[A]] = {
+    if (seq.length <= 15) seq :: Nil
+    else seq.splitAt(15) match { case (head, next) => head +: nested(next) }
   }
 
   def isMatch(cols: Seq[Column], params: Seq[MethodParam]): Boolean =

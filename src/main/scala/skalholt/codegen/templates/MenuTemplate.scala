@@ -4,7 +4,7 @@ import skalholt.codegen.util.StringUtil._
 
 case class Menu(pkgNm: String, actionId: String, actionClassId: String)
 object MenuTemplate {
-  def menuTemplate(menus: List[Menu]) =
+  def menuTemplate(menus: Seq[Menu]) =
     s"""@()
   <ul class="dropdown-menu">
     ${

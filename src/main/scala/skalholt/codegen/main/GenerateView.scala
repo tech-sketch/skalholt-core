@@ -1,22 +1,23 @@
 package skalholt.codegen.main
 
-import skalholt.codegen.database.{ Screens, ScreenItems, ScreenEntitys, ScreenActions }
-import skalholt.codegen.database.common.Tables.{ ScreenRow, ScreenItemRow, DomainRow }
+import skalholt.codegen.database.{Screens, ScreenItems, ScreenEntitys, ScreenActions}
+import skalholt.codegen.database.common.Tables.{ScreenRow, ScreenItemRow, DomainRow}
 import skalholt.codegen.templates.ViewTemplate._
-import java.io.{ FileOutputStream, IOException, FileNotFoundException, BufferedWriter, OutputStreamWriter, File }
-import skalholt.codegen.database.AnnotationDefinitions
 import skalholt.codegen.util.StringUtil._
-import skalholt.codegen.util.{ FileUtil, GenUtil }
+import skalholt.codegen.util.{FileUtil, GenUtil}
 import skalholt.codegen.constants.GenConstants._
-import skalholt.codegen.templates.{ Views, Action }
+import skalholt.codegen.templates.{Views, Action}
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import skalholt.codegen.database.common.DBUtils
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 object GenerateView extends App with LazyLogging {
 
   logger.info("start GenerateView")
 
-  require(ScreenItems.getScreenItemCount > 0, "出力対象の画面設計書項目が存在しません。")
+  require(Await.result(ScreenItems.getScreenItemCount, Duration.Inf) > 0,
+    "出力対象の画面設計書項目が存在しません。")
 
   // Viewのジェネレート
   val Array(slickDriver, jdbcDriver, url, catalog, schema, folder, tablesPkg, _*) =
@@ -39,40 +40,28 @@ object GenerateView extends App with LazyLogging {
   private def generate(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String])(folder: String, tablesPkg: String) = {
 
     // 処理対象のデータリスト(ACTION_CLASS_ID/SCREEN_ID)を取得
-    val actionClassIdList = Screens.find()
-    actionClassIdList.foreach {
+    Await.result(Screens.find(), Duration.Inf).foreach {
       case (Some(actionClassId), Some(subsystemNmEn)) =>
-        val screenItemList =
-          ScreenItems.findWithScreenAndDomain(actionClassId, subsystemNmEn)
-
+        val screenItemList = Await.result(ScreenItems.findWithScreenAndDomain(actionClassId, subsystemNmEn), Duration.Inf)
         if (screenItemList.size == 0) {
           logger.warn("ユースケース[" + actionClassId +
             "]の項目定義が存在しません。画面設計書を確認してください。")
         } else {
-          val screenList = Screens.findByActionClassIdAndSubsystem(actionClassId, subsystemNmEn)
+          val screenList = Await.result(Screens.findByActionClassIdAndSubsystem(actionClassId, subsystemNmEn), Duration.Inf)
 
           def createHtml(screen: ScreenRow) = {
             val actionClassId = screen.actionClassId.get
-
-            val (submitActionClassId, submitActionId) =
-              ScreenActions.findByScreenId(screen.screenId).headOption match {
-                case Some(screenAction) =>
-                  val (submitScreenId, submitActionId) = screenAction.forwardScreenId match {
-                    case Some("myself") => (screen.screenId, decapitalize(screenAction.actionNmEn.get))
-                    case Some(screenId) => (screenId, "index")
-                    case _ => (screen.screenId, "index")
-                  }
-                  (Screens.findById(submitScreenId) match {
-                    case Some(x) => x.actionClassId.getOrElse("")
-                    case x => ""
-                  },
-                    submitActionId)
-                case _ => (screen.screenId, "index")
-
-              }
+            val screenAction = Await.result(ScreenActions.findByScreenId(screen.screenId), Duration.Inf)
+            val (submitScreenId, submitActionId) = screenAction.head.forwardScreenId match {
+              case Some("myself") => (screen.screenId, decapitalize(screenAction.head.actionNmEn.get))
+              case Some(screenId) => (screenId, "index")
+              case _ => (screen.screenId, "index")
+            }
+            val x = Await.result(Screens.findById(submitScreenId), Duration.Inf)
+            val submitActionClassId = x.actionClassId.getOrElse("")
 
             val tableTitle = screen.screenNm.get
-            val entityNm = ScreenEntitys.findById(screen.screenId, 1).entityNmEn.get
+            val entityNm = Await.result(ScreenEntitys.findById(screen.screenId, 1), Duration.Inf).entityNmEn.getOrElse("")
 
             val rows = screenItemList.map {
               case (screenItem, screen, domain) =>
@@ -94,10 +83,7 @@ object GenerateView extends App with LazyLogging {
 
             def getfwPkg(fwScreenId: Option[String]) = fwScreenId match {
               case Some("myself") => pkgNm
-              case Some(id) => Screens.findById(id) match {
-                case Some(x) => x.subsystemNmEn.getOrElse(pkgNm)
-                case x => pkgNm
-              }
+              case Some(id) => Await.result(Screens.findById(id), Duration.Inf).subsystemNmEn.getOrElse(pkgNm)
               case _ => pkgNm
             }
 
@@ -116,15 +102,12 @@ object GenerateView extends App with LazyLogging {
               }
             }
             def getAction(screenItem: ScreenItemRow): Action = {
-              val screenAction = ScreenActions.findById(screen.screenId, screenItem(24).get)
-              val fwScreenType = screenAction.forwardScreenId match {
-                case Some("myself") => screen.screenType.getOrElse("")
-                case Some(screenId) => Screens.findById(screenId) match {
-                  case Some(s) => s.screenType.getOrElse("")
-                  case _ => ""
-                }
-                case screenId => ""
-              }
+              val screenAction = Await.result(ScreenActions.findById(screen.screenId, screenItem(24).get), Duration.Inf)
+              //              val fwScreenType = screenAction.forwardScreenId match {
+              //                case Some("myself") => screen.screenType.getOrElse("")
+              //                case Some(screenId) => Await.result(Screens.findById(screenId), Duration.Inf).screenType.getOrElse("")
+              //                case _ => ""
+              //              }
 
               Action(screenItem(8).get, screenAction.actionNmEn.getOrElse(""), getfwPkg(screenAction.forwardScreenId),
                 getfwSctionId(screenAction.screenId, screenAction.actionNmEn.get, screenAction.forwardScreenId.get),
@@ -143,12 +126,13 @@ object GenerateView extends App with LazyLogging {
                 } else "",
                 getIcon(screenAction.actionNmEn.get))
             }
-            val actions = ScreenItems.findByScreenIdWithAction(screen.screenId).map { case (item, action) => getAction(item) }
-            val resultActions = ScreenItems.getSearchResultActions(actionClassId, subsystemNmEn).map(getAction)
+            val screenItems = Await.result(ScreenItems.findByScreenIdWithAction(screen.screenId), Duration.Inf)
+            val actions = screenItems.map { case (item, action) => getAction(item) }
 
-            println("links--" + resultActions)
+            val resultActions = Await.result(ScreenItems.getSearchResultActions(actionClassId, subsystemNmEn), Duration.Inf).map(getAction)
 
-            val resultItems = (ScreenItems.getSearchResultItems(actionClassId, subsystemNmEn).map(r => (r(4).get, r(6).get)), resultActions)
+            val screenItem = Await.result(ScreenItems.getSearchResultItems(actionClassId, subsystemNmEn), Duration.Inf)
+            val resultItems = (screenItem.map(r => (r(4).get, r(6).get)), resultActions)
 
             val allColumns = DBUtils.getColumns(jdbcDriver, url, schema, user, password)(entityNm)
             val columnLength = allColumns.length
@@ -170,11 +154,11 @@ object GenerateView extends App with LazyLogging {
             }
 
             FileUtil.createFile(str, s"${folder}/app/views/${pkgNm.toLowerCase}", screen.actionClassId.get + ".scala.html", overrideView)
-
           }
           screenList.foreach(createHtml)
         }
       case _ =>
     }
   }
+
 }

@@ -1,11 +1,11 @@
 package skalholt.codegen.templates
 
-import scala.slick.model.Column
+import slick.model.Column
 import skalholt.codegen.util.StringUtil._
 import skalholt.codegen.util.MethodParam
 import skalholt.codegen.util.MethodParam
 
-case class Controllers(pkgNm: String, entityNm: String, actionClassId: String, actionNms: List[String], keys: List[MethodParam], tablePkg: String, rows: List[MethodParam], columns: List[Column], isMatch: Boolean)
+case class Controllers(pkgNm: String, entityNm: String, actionClassId: String, actionNms: Seq[String], keys: Seq[MethodParam], tablePkg: String, rows: Seq[MethodParam], columns: List[Column], isMatch: Boolean)
 object ControllerTemplate {
 
   /** Controller */
@@ -14,23 +14,28 @@ object ControllerTemplate {
 
 import ${c.actionClassId.toLowerCase}.{ Index${if (c.actionNms.isEmpty) "" else ", "}${c.actionNms.mkString(", ")} }
 
-object ${capitalize(c.actionClassId)} extends Index${if (c.actionNms.isEmpty) "" else " with "}${c.actionNms.mkString(" with ")}
+class ${capitalize(c.actionClassId)} extends Index${if (c.actionNms.isEmpty) "" else " with "}${c.actionNms.mkString(" with ")}
 """
 
   /** Controller XxxCreate Index */
   val indexCreateTemplate = (c: Controllers) =>
     s"""package controllers.${c.pkgNm}.${c.actionClassId.toLowerCase}
 
-import play.api.db.slick._
+import play.api.i18n.Messages.Implicits._
 import play.api.mvc._
+import play.api.Play.current
 import logics.${c.entityNm.toLowerCase}.IndexLogic
 import forms.${c.pkgNm}.${capitalize(c.actionClassId)}Form
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait Index extends Controller with ${capitalize(c.actionClassId)}Form {
 
-  def index = DBAction.transaction { implicit request =>
+  def index = Action.async { implicit request =>
     IndexLogic.logic
-    Ok(views.html.${c.pkgNm}.${c.actionClassId}(${c.actionClassId}Form))
+    Future {
+      Ok(views.html.${c.pkgNm}.${c.actionClassId}(${c.actionClassId}Form))
+    }
   }
 }"""
 
@@ -38,17 +43,17 @@ trait Index extends Controller with ${capitalize(c.actionClassId)}Form {
   val indexUpdateTemplate = (c: Controllers) =>
     s"""package controllers.${c.pkgNm}.${c.actionClassId.toLowerCase}
 
-import play.api.db.slick._
+import play.api.i18n.Messages.Implicits._
 import play.api.mvc._
+import play.api.Play.current
 import logics.${c.entityNm.toLowerCase}.IndexLogic
-import daos.${capitalize(c.entityNm)}s
-import ${c.tablePkg}.Tables._
 import forms.${c.pkgNm}.{ ${capitalize(c.actionClassId)}Form, ${capitalize(c.actionClassId)}Data }
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait Index extends Controller with ${capitalize(c.actionClassId)}Form {
 
-  def index(${c.keys.map(p => s"${p.pname}: ${p.ptype}").mkString(", ")}) = DBAction.transaction { implicit request =>
-    IndexLogic.logic(${c.keys.map(p => s"${p.pname}").mkString(", ")}) match {
+  def index(${c.keys.map(p => s"${p.pname}: ${p.ptype}").mkString(", ")}) = Action.async { implicit request =>
+    IndexLogic.logic(${c.keys.map(p => s"${p.pname}").mkString(", ")}).map {
       case Some(${c.entityNm}) =>
         ${
       if (c.isMatch)
@@ -67,7 +72,7 @@ trait Index extends Controller with ${capitalize(c.actionClassId)}Form {
               case _ =>
                 "None"
             }
-          }.mkString(" ,")
+          }.mkString(", ")
         })"
     }
         Ok(views.html.${c.pkgNm}.${c.actionClassId}(${c.actionClassId}Form.fill(${if (c.isMatch) s"${c.entityNm}" else s"${c.entityNm}Form"}), ${c.keys.map(p => s"${p.pname}").mkString(", ")}))
@@ -82,16 +87,21 @@ trait Index extends Controller with ${capitalize(c.actionClassId)}Form {
   val indexSearchTemplate = (c: Controllers) =>
     s"""package controllers.${c.pkgNm}.${c.actionClassId.toLowerCase}
 
-import play.api.db.slick._
+import play.api.i18n.Messages.Implicits._
 import play.api.mvc._
+import play.api.Play.current
 import logics.${c.entityNm.toLowerCase}.IndexLogic
 import forms.${c.pkgNm}.${capitalize(c.actionClassId)}Form
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait Index extends Controller with ${capitalize(c.actionClassId)}Form {
 
-  def index = DBAction.transaction { implicit request =>
+  def index = Action.async { implicit request =>
     IndexLogic.logic
-    Ok(views.html.${c.pkgNm}.${c.actionClassId}(${c.actionClassId}Form, null))
+    Future {
+      Ok(views.html.${c.pkgNm}.${c.actionClassId}(${c.actionClassId}Form, null))
+    }
   }
 }"""
 
@@ -115,22 +125,29 @@ trait Index extends Controller with ${capitalize(c.actionClassId)}Form {
   val createTemplate = (c: Controllers) =>
     s"""package controllers.${c.pkgNm}.${c.actionClassId.toLowerCase}
 
-import play.api.db.slick._
+import play.api.i18n.Messages.Implicits._
 import play.api.mvc._
+import play.api.Play.current
 import logics.${c.entityNm.toLowerCase}.CreateLogic
 import forms.${c.pkgNm}.${capitalize(c.actionClassId)}Form
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait Create extends Controller with ${capitalize(c.actionClassId)}Form {
 
-  def create = DBAction.transaction { implicit request =>
+  def create = Action.async { implicit request =>
     ${c.actionClassId}Form.bindFromRequest.fold(
       hasErrors = { form =>
-        BadRequest(views.html.${c.pkgNm}.${c.actionClassId}(form))
+        Future {
+          BadRequest(views.html.${c.pkgNm}.${c.actionClassId}(form))
+        }
       },
       success = { form =>
         CreateLogic.logic(form)
-        Redirect(controllers.${c.pkgNm}.routes.${capitalize(c.actionClassId)}.index)
-          .flashing("success" -> "Registration was successful.")
+        Future {
+          Redirect(controllers.${c.pkgNm}.routes.${capitalize(c.actionClassId)}.index)
+            .flashing("success" -> "Registration was successful.")
+        }
       })
   }
 }
@@ -140,22 +157,25 @@ trait Create extends Controller with ${capitalize(c.actionClassId)}Form {
   def updateTemplate = (c: Controllers) =>
     s"""package controllers.${c.pkgNm}.${c.actionClassId.toLowerCase}
 
-import play.api.db.slick._
+import play.api.i18n.Messages.Implicits._
 import play.api.mvc._
-import daos.${capitalize(c.entityNm)}s
-import models.Tables._
+import play.api.Play.current
 import logics.${c.entityNm.toLowerCase}.UpdateLogic
 import forms.${c.pkgNm}.${capitalize(c.actionClassId)}Form
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait Update extends Controller with ${capitalize(c.actionClassId)}Form {
 
-  def update(${c.keys.map(p => s"${p.pname}: ${p.ptype}").mkString(", ")}) = DBAction.transaction { implicit request =>
+  def update(${c.keys.map(p => s"${p.pname}: ${p.ptype}").mkString(", ")}) = Action.async { implicit request =>
     ${c.actionClassId}Form.bindFromRequest.fold(
       hasErrors = { form =>
-        BadRequest(views.html.${c.pkgNm}.${c.actionClassId}(form, ${c.keys.map(p => s"${p.pname}").mkString(", ")}))
+        Future {
+          BadRequest(views.html.${c.pkgNm}.${c.actionClassId}(form, ${c.keys.map(p => s"${p.pname}").mkString(", ")}))
+        }
       },
       success = { form =>
-        UpdateLogic.logic(form) match {
+        UpdateLogic.logic(form).map {
           case count: Int if (count > 0) =>
             Redirect(controllers.${c.pkgNm}.routes.${capitalize(c.actionClassId)}.index(${c.keys.map(p => s"${p.pname}").mkString(", ")}))
               .flashing("success" -> "Update was successful.")
@@ -172,27 +192,31 @@ trait Update extends Controller with ${capitalize(c.actionClassId)}Form {
   def searchTemplate = (c: Controllers) =>
     s"""package controllers.${c.pkgNm}.${c.actionClassId.toLowerCase}
 
-import play.api.db.slick._
+import play.api.i18n.Messages.Implicits._
 import play.api.mvc._
-import daos.${capitalize(c.entityNm)}s
+import play.api.Play.current
 import models.Tables._
 import logics.${c.entityNm.toLowerCase}.SearchLogic
 import forms.${c.pkgNm}.${capitalize(c.actionClassId)}Form
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait Search extends Controller with ${capitalize(c.actionClassId)}Form {
 
-  def search = DBAction.transaction { implicit request =>
+  def search = Action.async { implicit request =>
     ${c.actionClassId}Form.bindFromRequest.fold(
       hasErrors = { form =>
-        BadRequest(views.html.${c.pkgNm}.${c.actionClassId}(form, List.empty[${capitalize(c.entityNm)}Row]))
+        Future {
+          BadRequest(views.html.${c.pkgNm}.${c.actionClassId}(form, List.empty[${capitalize(c.entityNm)}Row]))
+        }
       },
       success = { form =>
-        SearchLogic.logic(form) match {
+        SearchLogic.logic(form).map {
           case ${c.entityNm}s if (${c.entityNm}s.length > 0) =>
             Ok(views.html.${c.pkgNm}.${c.actionClassId}(${c.actionClassId}Form.bindFromRequest, ${c.entityNm}s))
           case _ =>
             BadRequest(views.html.${c.pkgNm}.${c.actionClassId}(
-              ${c.actionClassId}Form.withGlobalError("No data found.").bindFromRequest, List.empty[${capitalize(c.entityNm)}Row]))
+              ${c.actionClassId}Form.withGlobalError("No data found.").bindFromRequest, Seq.empty[${capitalize(c.entityNm)}Row]))
         }
       })
   }
@@ -203,15 +227,14 @@ trait Search extends Controller with ${capitalize(c.actionClassId)}Form {
   def deleteTemplate = (c: Controllers) =>
     s"""package controllers.${c.pkgNm}.${c.actionClassId.toLowerCase}
 
-import play.api.db.slick._
 import play.api.mvc._
-import daos.${capitalize(c.entityNm)}s
 import logics.${c.entityNm.toLowerCase}.DeleteLogic
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait Delete extends Controller {
 
-  def delete(${c.keys.map(p => s"${p.pname}: ${p.ptype}").mkString(", ")}) = DBAction.transaction { implicit request =>
-    DeleteLogic.logic(${c.keys.map(p => s"${p.pname}").mkString(", ")}) match {
+  def delete(${c.keys.map(p => s"${p.pname}: ${p.ptype}").mkString(", ")}) = Action.async { implicit request =>
+    DeleteLogic.logic(${c.keys.map(p => s"${p.pname}").mkString(", ")}).map {
       case count if (count > 0) =>
         Redirect(controllers.${c.pkgNm}.routes.${capitalize(c.actionClassId)}.index)
           .flashing("success" -> "Delete was successful.")
@@ -227,19 +250,21 @@ trait Delete extends Controller {
   def indexCreateLogicTemplate = (c: Controllers) =>
     s"""package logics.${c.entityNm.toLowerCase}
 
-import play.api.db.slick._
-import play.api.mvc._
+import logics.common.AbstractLogic
 import daos.${capitalize(c.entityNm)}s
 import models.Tables.${capitalize(c.entityNm)}Row
+import scala.concurrent.Future
+import slick.driver.H2Driver.api._
 
-object IndexLogic extends Controller {
+object IndexLogic extends AbstractLogic {
 
   def logic = {
     None
   }
 
-  def logic(${c.keys.map(p => s"${p.pname}: ${p.ptype}").mkString(" ,")})(implicit request: DBSessionRequest[AnyContent]): Option[${capitalize(c.entityNm)}Row] = {
-    ${capitalize(c.entityNm)}s.filterById(${c.keys.map(p => if (p.pmaptype == "bigDecimal") s"BigDecimal(${p.pname})" else s"${p.pname}").mkString(" ,")})
+  def logic(${c.keys.map(p => s"${p.pname}: ${p.ptype}").mkString(" ,")}): Future[Option[${capitalize(c.entityNm)}Row]] = {
+    val action = ${capitalize(c.entityNm)}s.filterById(${c.keys.map(p => if (p.pmaptype == "bigDecimal") s"BigDecimal(${p.pname})" else s"${p.pname}").mkString(" ,")})
+    db.run(action)
   }
 }
 """
@@ -248,16 +273,16 @@ object IndexLogic extends Controller {
   def createLogicTemplate = (c: Controllers) =>
     s"""package logics.${c.entityNm.toLowerCase}
 
-import play.api.db.slick._
-import play.api.mvc._
+import logics.common.AbstractLogic
 import daos.${capitalize(c.entityNm)}s
-import models.Tables._
 import models.Tables.${capitalize(c.entityNm)}Row
 ${if (c.isMatch) "" else s"import forms.${c.pkgNm.toLowerCase}.${capitalize(c.actionClassId)}Data"}
+import scala.concurrent.Future
+import slick.driver.H2Driver.api._
 
-object CreateLogic extends Controller {
+object CreateLogic extends AbstractLogic {
 
-  def logic(${if (c.isMatch) s"${c.entityNm}Row: ${capitalize(c.entityNm)}Row" else s"data: ${capitalize(c.actionClassId)}Data"})(implicit request: DBSessionRequest[AnyContent]): Int = {
+  def logic(${if (c.isMatch) s"${c.entityNm}Row: ${capitalize(c.entityNm)}Row" else s"data: ${capitalize(c.actionClassId)}Data"}): Future[Unit] = {
     ${
       if (c.isMatch) "" else s"val ${c.entityNm}Row = ${capitalize(c.entityNm)}Row(${
         c.columns.map {
@@ -267,10 +292,11 @@ object CreateLogic extends Controller {
               case Some(row) => form2Table(col, row, s"data.${decapitalize(camelize(col.name))}")
               case _ => "None"
             }
-        }.mkString(" ,")
+        }.mkString(", ")
       })"
     }
-    ${capitalize(c.entityNm)}s.insert(${c.entityNm}Row)
+    val action = ${capitalize(c.entityNm)}s.insert(${c.entityNm}Row)
+    db.run(action)
   }
 }
 """
@@ -278,14 +304,15 @@ object CreateLogic extends Controller {
   def updateLogicTemplate = (c: Controllers) =>
     s"""package logics.${c.entityNm.toLowerCase}
 
-import play.api.db.slick._
-import play.api.mvc._
+import logics.common.AbstractLogic
 import daos.${capitalize(c.entityNm)}s
 import models.Tables.${capitalize(c.entityNm)}Row
 ${if (c.isMatch) "" else s"import forms.${c.pkgNm.toLowerCase}.${capitalize(c.actionClassId)}Data"}
+import scala.concurrent.Future
+import slick.driver.H2Driver.api._
 
-object UpdateLogic extends Controller {
-  def logic(${if (c.isMatch) s"${c.entityNm}Row: ${capitalize(c.entityNm)}Row" else s"data: ${capitalize(c.actionClassId)}Data"})(implicit request: DBSessionRequest[AnyContent]): Int = {
+object UpdateLogic extends AbstractLogic {
+  def logic(${if (c.isMatch) s"${c.entityNm}Row: ${capitalize(c.entityNm)}Row" else s"data: ${capitalize(c.actionClassId)}Data"}): Future[Int] = {
     ${
       if (c.isMatch) "" else s"val ${c.entityNm}Row = ${capitalize(c.entityNm)}Row(${
         c.columns.map {
@@ -297,7 +324,8 @@ object UpdateLogic extends Controller {
         }.mkString(" ,")
       })"
     }
-    ${capitalize(c.entityNm)}s.update(${c.entityNm}Row)
+    val action = ${capitalize(c.entityNm)}s.update(${c.entityNm}Row)
+    db.run(action)
   }
 }
 """
@@ -306,17 +334,18 @@ object UpdateLogic extends Controller {
   def searchLogicTemplate = (c: Controllers) =>
     s"""package logics.${c.entityNm.toLowerCase}
 
-import play.api.db.slick._
-import play.api.mvc._
+import logics.common.AbstractLogic
 import daos.${capitalize(c.entityNm)}s
-import models.Tables._
 import models.Tables.${capitalize(c.entityNm)}Row
 import forms.${c.pkgNm}.${capitalize(c.actionClassId)}Data
+import scala.concurrent.Future
+import slick.driver.H2Driver.api._
 
-object SearchLogic {
+object SearchLogic extends AbstractLogic {
 
-  def logic(data: ${capitalize(c.actionClassId)}Data)(implicit request: DBSessionRequest[AnyContent]): List[${capitalize(c.entityNm)}Row] = {
-    ${capitalize(c.entityNm)}s.filter(data)
+  def logic(data: ${capitalize(c.actionClassId)}Data): Future[Seq[${capitalize(c.entityNm)}Row]] = {
+    val action = ${capitalize(c.entityNm)}s.filter(data)
+    db.run(action)
   }
 }
 """
@@ -325,13 +354,15 @@ object SearchLogic {
   def deleteLogicTemplate = (c: Controllers) =>
     s"""package logics.${c.entityNm.toLowerCase}
 
-import play.api.db.slick._
-import play.api.mvc._
+import logics.common.AbstractLogic
 import daos.${capitalize(c.entityNm)}s
+import scala.concurrent.Future
+import slick.driver.H2Driver.api._
 
-object DeleteLogic extends Controller {
-  def logic(${c.keys.map(p => s"${p.pname}: ${p.ptype}").mkString(" ,")})(implicit request: DBSessionRequest[AnyContent]): Int = {
-    ${capitalize(c.entityNm)}s.remove(${c.keys.map(p => if (p.pmaptype == "bigDecimal") s"BigDecimal(${p.pname})" else s"${p.pname}").mkString(" ,")})
+object DeleteLogic extends AbstractLogic {
+  def logic(${c.keys.map(p => s"${p.pname}: ${p.ptype}").mkString(" ,")}): Future[Int] = {
+    val action = ${capitalize(c.entityNm)}s.remove(${c.keys.map(p => if (p.pmaptype == "bigDecimal") s"BigDecimal(${p.pname})" else s"${p.pname}").mkString(" ,")})
+    db.run(action)
   }
 }
 """

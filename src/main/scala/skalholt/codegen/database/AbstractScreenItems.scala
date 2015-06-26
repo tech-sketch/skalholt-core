@@ -1,36 +1,40 @@
 package skalholt.codegen.database
 
 import skalholt.codegen.database.common.Tables._
-import skalholt.codegen.database.common.BaseDatabase.profile.simple._
+import slick.driver.H2Driver.api._
 import skalholt.codegen.database.common.AbstractDao
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 abstract class AbstractScreenItems extends AbstractDao {
   /** テーブル作成 */
-  def createTable = database.withSession { implicit session: Session =>
-    ScreenItem.ddl.create
+  def createTable = {
+    db.run(ScreenItem.schema.create)
   }
 
   /** テーブル削除 */
-  def dropTable = database.withSession { implicit session: Session =>
-    ScreenItem.ddl.drop
+  def dropTable = {
+    db.run(ScreenItem.schema.drop)
   }
   /** 登録 */
-  def create(e: ScreenItemRow) = database.withTransaction { implicit session: Session =>
-    ScreenItem.insert(e)
+  def create(e: ScreenItemRow) = {
+    db.run(DBIO.seq(ScreenItem += e))
   }
 
   /** 更新 */
-  def update(e: ScreenItemRow) = database.withTransaction { implicit session: Session =>
-    ScreenItem.filter(t => t.screenId === e(0) && t.itemNo === e(1)).update(e)
+  def update(e: ScreenItemRow) = {
+    val q = for{s <- ScreenItem if (s.screenId === e(0)  && s.itemNo === e(1))} yield s
+    db.run(q.update(e))
   }
 
   /** 削除 */
-  def delete(screenId :String, itemNo :scala.math.BigDecimal) = database.withTransaction { implicit session: Session =>
-    ScreenItem.filter(t => t.screenId === screenId && t.itemNo === itemNo).delete
+  def delete(screenId :String, itemNo :scala.math.BigDecimal) = {
+    db.run(ScreenItem.filter(t => t.screenId === screenId && t.itemNo === itemNo).delete)
   }
 
   /** ID検索 */
-  def findById(screenId :String, itemNo :scala.math.BigDecimal): ScreenItemRow = database.withTransaction { implicit session: Session =>
-    ScreenItem.filter(t => t.screenId === screenId && t.itemNo === itemNo).first
+  def findById(screenId :String, itemNo :scala.math.BigDecimal): Future[ScreenItemRow] = {
+    val action = ScreenItem.filter(t => t.screenId === screenId && t.itemNo === itemNo).result
+    db.run(action.head)
   }
 }

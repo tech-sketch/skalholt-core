@@ -1,5 +1,6 @@
 package skalholt.codegen.util
-import java.io.{ FileOutputStream, IOException, FileNotFoundException, BufferedWriter, OutputStreamWriter, File }
+
+import java.io.{FileOutputStream, IOException, FileNotFoundException, BufferedWriter, OutputStreamWriter, File}
 import skalholt.codegen.constants.GenConstants._
 
 object FileUtil {
@@ -46,7 +47,7 @@ object FileUtil {
   def createDirectory(createPath: String) = {
     val targetDirectory = new File(createPath)
     if (!targetDirectory.exists() && !targetDirectory.mkdirs())
-      throw new RuntimeException("フォルダを作成できませんでした。[" + createPath + "]")
+      if (!targetDirectory.exists()) throw new RuntimeException("フォルダを作成できませんでした。[" + createPath + "]")
   }
 
 }

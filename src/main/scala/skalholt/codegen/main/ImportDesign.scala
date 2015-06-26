@@ -1,7 +1,8 @@
 package skalholt.codegen.main
 
-import scala.slick.codegen.SourceCodeGenerator
-import scala.slick.model.Model
+import skalholt.codegen.database.common.DBUtils._
+import slick.codegen.SourceCodeGenerator
+import slick.model.Model
 import skalholt.codegen.util.StringUtil._
 import skalholt.codegen.database.{ Screens, ScreenItems, ScreenActions, ScreenEntitys, Domains, AnnotationDefinitions }
 import skalholt.codegen.database.common.Tables.{ ScreenItemRow, ScreenRow, ScreenActionRow, ScreenEntityRow, DomainRow, AnnotationRow, AnnotationDefinitionRow }
@@ -35,6 +36,9 @@ object ImportDesign extends App with LazyLogging {
     val Array(slickDriver, jdbcDriver, url, catalog, schema, outputDir, pkg, _*) = args
     val (user, password) = if (args.size > 7) (Some(args(7)), Some(args(8))) else (None, None)
     val model = DBUtils.getModel(jdbcDriver, url, schema, user, password)
+    logger.info("----- tables -----")
+    model.tables.zipWithIndex.foreach{case (table, index) => logger.info(s"${f"${index + 1}% 4d"}.${table.name.table}") }
+    logger.info("------------------")
 
     truncates
 
@@ -56,8 +60,8 @@ object ImportDesign extends App with LazyLogging {
 
   private def imports(model: Model, folder: String)(screenType: ScreenType) = {
     val codegen = new SourceCodeGenerator(model)
-    def outputByTable(table: scala.slick.model.Table) = {
-      import scala.slick.ast.ColumnOption.PrimaryKey
+    def outputByTable(table: slick.model.Table) = {
+      import slick.ast.ColumnOption.PrimaryKey
 
       // -----Screen-----
       val tableNm = decapitalize(camelize(table.name.table))
@@ -78,7 +82,7 @@ object ImportDesign extends App with LazyLogging {
       Screens.create(screen)
 
       // -----ScreenItem-----
-      def importScreenItem(column: scala.slick.model.Column, itemNo: Int) = {
+      def importScreenItem(column: slick.model.Column, itemNo: Int) = {
         //val screenId = None
         //val itemNo = 1
         val columnNm = decapitalize(camelize(column.name))
@@ -180,7 +184,7 @@ object ImportDesign extends App with LazyLogging {
 
       }
 
-      def importScreenItemButton(column: scala.slick.model.Column, columnNm: String = screenType.toString, itemNo: Int = 9000, component: Option[String] = Some("button")) = {
+      def importScreenItemButton(column: slick.model.Column, columnNm: String = screenType.toString, itemNo: Int = 9000, component: Option[String] = Some("button")) = {
         //val screenId = None
         //val itemNo = 9999
         //val columnNm = screenType

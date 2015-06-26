@@ -3,10 +3,10 @@ package skalholt.codegen.templates
 import scala.collection.immutable.Map
 import skalholt.codegen.util.StringUtil._
 import skalholt.codegen.util.MethodParam
-import scala.slick.model.Column
+import slick.model.Column
 
 case class Mappings(name: String, iname: String, mapValue: String)
-case class Forms(pkgNm: String, imports: List[String], mappings: List[List[Mappings]], actionClassId: String, params: List[List[MethodParam]], entityNm: String, screenType: String, columns: List[Column], isMatch : Boolean)
+case class Forms(pkgNm: String, imports: List[String], mappings: Seq[Seq[Mappings]], actionClassId: String, params: Seq[Seq[MethodParam]], entityNm: String, screenType: String, columns: List[Column], isMatch : Boolean)
 object FormTemplate {
   def formTemplate(f: Forms) =
     s"""package forms.${f.pkgNm}

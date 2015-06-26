@@ -1,7 +1,7 @@
 package skalholt.codegen.main
 
-import scala.slick.codegen.SourceCodeGenerator
-import scala.slick.model.{ Model, Table }
+import slick.codegen.SourceCodeGenerator
+import slick.model.{ Model, Table }
 import skalholt.codegen.constants.GenConstants._
 import skalholt.codegen.database.common.DBUtils
 import skalholt.codegen.templates.DaoTemplate._
@@ -42,14 +42,14 @@ object GenerateDao extends App with LazyLogging {
   }
 
   private def generateEntity(model: Model, folder: String, driver: String, pkg: String) = {
-    val codegen = new SourceCodeGenerator(model);
+    val codegen = new SourceCodeGenerator(model)
     codegen.writeToFile(driver, folder, pkg)
   }
 
   private def GenerateDao(model: Model, folder: String, slickDriver: String, pkg: String) = {
     val codegen = new SourceCodeGenerator(model)
     def outputByTable(table: Table) = {
-      import scala.slick.ast.ColumnOption.PrimaryKey
+      import slick.ast.ColumnOption.PrimaryKey
 
       val pks = (table.primaryKey match {
         case Some(x) => x.columns

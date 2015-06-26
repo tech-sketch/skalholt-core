@@ -1,16 +1,17 @@
 package skalholt.codegen.database
 
 import skalholt.codegen.database.common.Tables._
-import skalholt.codegen.database.common.BaseDatabase.profile.simple._
+import slick.driver.H2Driver.api._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 object ScreenEntitys extends AbstractScreenEntitys {
 
-  def truncate = {
-    truncateTable("SCREEN_ENTITY")
-  }
+  def truncate = truncateTable("SCREEN_ENTITY")
 
-  def filterByScreen(screenId :String): Option[ScreenEntityRow] = database.withTransaction { implicit session: Session =>
-    ScreenEntity.filter(_.screenId === screenId).firstOption
+  def filterByScreen(screenId: String): Future[Option[ScreenEntityRow]] = {
+    val q = ScreenEntity.filter(_.screenId === screenId).result.headOption
+    db.run(q)
   }
 
 }

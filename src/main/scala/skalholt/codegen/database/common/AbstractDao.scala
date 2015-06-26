@@ -1,14 +1,16 @@
 package skalholt.codegen.database.common
 
-import BaseDatabase.profile.simple._
 import skalholt.codegen.constants.GenConstants._
-import scala.slick.jdbc.StaticQuery
+import slick.driver.H2Driver.api._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 abstract class AbstractDao {
 
-  val database = Database.forURL(genUrl, genUser, genPassword, null, genDriver)
+  val db = Database.forURL(genUrl, genUser, genPassword, null, genDriver)
 
-  def truncateTable(tableNm: String) = database.withSession { implicit session: Session =>
-    StaticQuery.updateNA(s"""TRUNCATE TABLE ${if (genSchema.isEmpty()) "" else s""""${genSchema}".""" }"${tableNm}"""").execute
+  def truncateTable(tableNm: String) =  {
+    val schema = if (genSchema.isEmpty) "" else genSchema + "."
+    val q = sqlu"TRUNCATE TABLE #${schema}#${tableNm}"
+    db.run(q)
   }
 }

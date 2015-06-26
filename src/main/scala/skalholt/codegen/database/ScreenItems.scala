@@ -1,34 +1,42 @@
 package skalholt.codegen.database
 
 import skalholt.codegen.database.common.Tables._
-import skalholt.codegen.database.common.BaseDatabase.profile.simple._
+import slick.driver.H2Driver.api._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 object ScreenItems extends AbstractScreenItems {
 
-  def findWithScreenAndDomain(actionClassId: String, subsystemNmEn: String) = database.withTransaction { implicit session: Session =>
+  def truncate = truncateTable("SCREEN_ITEM")
+
+  def findWithScreenAndDomain(actionClassId: String, subsystemNmEn: String): Future[Seq[(ScreenItemRow, ScreenRow, DomainRow)]] = {
     val q = (for (
       c1 <- ScreenItem;
       c2 <- Screen if (c2.actionClassId === actionClassId && c2.subsystemNmEn === subsystemNmEn) && (c1.screenId === c2.screenId);
       c3 <- Domain if (c1.domainCd === c3.domainCd)
     ) yield (c1, c2, c3)).sortBy { case (screenItem, screen, domain) => (screen.screenRbn, screenItem.itemNo) }
-    q.list
+
+    db.run(q.result)
   }
 
   /** 検索 */
-  def getSearchResultActions(actionClassId: String, subsystemNmEn: String) = database.withTransaction { implicit session: Session =>
+  def getSearchResultActions(actionClassId: String, subsystemNmEn: String): Future[Seq[ScreenItemRow]] = {
     val q = (for (
       c1 <- ScreenItem if (!c1.actionId.isEmpty && c1.searchresultFlag === "1");
       c2 <- Screen if (c2.actionClassId === actionClassId && c2.subsystemNmEn === subsystemNmEn) && (c1.screenId === c2.screenId)
     ) yield (c1, c2)).sortBy { case (screenItem, screen) => (screen.screenRbn, screenItem.itemNo) }
-    q.list.map { case (screenItem, screen) => screenItem }
+    val a = q.map { case (screenItem, screen) => screenItem }
+    db.run(a.result)
   }
 
-  def getSearchResultItems(actionClassId: String, subsystemNmEn: String) = database.withTransaction { implicit session: Session =>
+  def getSearchResultItems(actionClassId: String, subsystemNmEn: String) :Future[Seq[ScreenItemRow]] = {
     val q = (for (
       c1 <- ScreenItem if (c1.actionId.isEmpty && c1.searchresultFlag === "1");
       c2 <- Screen if (c2.actionClassId === actionClassId && c2.subsystemNmEn === subsystemNmEn) && (c1.screenId === c2.screenId)
     ) yield (c1, c2)).sortBy { case (screenItem, screen) => (screen.screenRbn, screenItem.itemNo) }
-    q.list.map { case (screenItem, screen) => screenItem }
+    val a = q.map { case (screenItem, screen) => screenItem }
+    db.run(a.result)
+
   }
 
   /**
@@ -36,8 +44,8 @@ object ScreenItems extends AbstractScreenItems {
    *
    * @return 取得行数(取得できなかった場合は0件)
    */
-  def getScreenItemCount() = database.withTransaction { implicit session: Session =>
-    ScreenItem.list.length
+  def getScreenItemCount() = {
+    db.run(ScreenItem.length.result)
   }
 
   /**
@@ -47,33 +55,31 @@ object ScreenItems extends AbstractScreenItems {
    * @param subsystemNmEn サブシステム名(英名)
    * @return エンティティのリスト
    */
-  def findByActionClassIdWithScreen(actionClassId: String, subsystemNmEn: String) = database.withTransaction { implicit session: Session =>
+  def findByActionClassIdWithScreen(actionClassId: String, subsystemNmEn: String): Future[Seq[ScreenItemRow]] = {
 
     val q = (for (
       c1 <- ScreenItem;
       c2 <- Screen if (c2.actionClassId === actionClassId && c2.subsystemNmEn === subsystemNmEn) && (c1.screenId === c2.screenId)
     ) yield (c1, c2)).sortBy { case (screenItem, screen) => (screen.screenRbn, screenItem.itemNo) }
 
-    q.list.map { case (screenItem, screen) => screenItem }
+    val a = q.map { case (screenItem, screen) => screenItem }
+    db.run(a.result)
   }
 
-  def findByScreenIdWithAction(screenId: String): List[(ScreenItemRow, ScreenActionRow)] = database.withTransaction { implicit session: Session =>
+  def findByScreenIdWithAction(screenId: String): Future[Seq[(ScreenItemRow, ScreenActionRow)]] = {
 
     val q = (for (
       si <- ScreenItem if (si.screenId === screenId && si.searchresultFlag === "0");
-      sa <- ScreenAction if (si.screenId === sa.screenId && si.actionId === sa.actionId && sa.actionNmEn.isNotNull)
+      sa <- ScreenAction if (si.screenId === sa.screenId && si.actionId === sa.actionId && sa.actionNmEn.isDefined)
     ) yield (si, sa)).sortBy { case (screenItem, screenAction) => (screenItem.itemNo) }
 
-    q.list
+    db.run(q.result)
   }
 
-  def truncate = {
-    truncateTable("SCREEN_ITEM")
-  }
+  def findByActionId(screenId: String, actionId: String): Future[Option[ScreenItemRow]] = {
 
-  def findByActionId(screenId: String, actionId: String): Option[ScreenItemRow] = database.withTransaction { implicit session: Session =>
-
-    ScreenItem.filter(s => s.screenId === screenId && s.actionId === actionId).list.headOption
+    val q = ScreenItem.filter(s => s.screenId === screenId && s.actionId === actionId)
+    db.run(q.result.headOption)
 
   }
 
