@@ -23,9 +23,10 @@ object DBUtils extends AbstractDao with LazyLogging {
         Database.forURL(url, driver = jdbcDriver)
 
     val tablesA = MTable.getTables(None, Some(schema), None, None)
+
     Await.result(db.run(tablesA), Duration.Inf)
+      .filter(_.tableType == "TABLE")
       .filter(t => !ignoreTables.exists(_.equalsIgnoreCase(t.name.name)))
-      .filter(t => (!t.name.name.endsWith("_pkey") && !t.name.name.endsWith("_seq")))
   }
 
   def getModel(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String]) = {
