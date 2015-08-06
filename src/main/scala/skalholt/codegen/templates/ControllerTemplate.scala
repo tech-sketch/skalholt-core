@@ -5,7 +5,7 @@ import skalholt.codegen.util.StringUtil._
 import skalholt.codegen.util.MethodParam
 import skalholt.codegen.util.MethodParam
 
-case class Controllers(pkgNm: String, entityNm: String, actionClassId: String, actionNms: Seq[String], keys: Seq[MethodParam], tablePkg: String, rows: Seq[MethodParam], columns: List[Column], isMatch: Boolean)
+case class Controllers(pkgNm: String, entityNm: String, actionClassId: String, actionNms: Seq[String], keys: Seq[MethodParam], tablePkg: String, rows: Seq[MethodParam], columns: List[Column], isMatch: Boolean, slickDriver: String)
 object ControllerTemplate {
 
   /** Controller */
@@ -262,7 +262,7 @@ import logics.common.AbstractLogic
 import daos.${capitalize(c.entityNm)}s
 import models.Tables.${capitalize(c.entityNm)}Row
 import scala.concurrent.Future
-import slick.driver.H2Driver.api._
+import ${c.slickDriver}.api._
 
 object IndexLogic extends AbstractLogic {
 
@@ -286,7 +286,7 @@ import daos.${capitalize(c.entityNm)}s
 import models.Tables.${capitalize(c.entityNm)}Row
 ${if (c.isMatch) "" else s"import forms.${c.pkgNm.toLowerCase}.${capitalize(c.actionClassId)}Data"}
 import scala.concurrent.Future
-import slick.driver.H2Driver.api._
+import ${c.slickDriver}.api._
 
 object CreateLogic extends AbstractLogic {
 
@@ -317,7 +317,7 @@ import daos.${capitalize(c.entityNm)}s
 import models.Tables.${capitalize(c.entityNm)}Row
 ${if (c.isMatch) "" else s"import forms.${c.pkgNm.toLowerCase}.${capitalize(c.actionClassId)}Data"}
 import scala.concurrent.Future
-import slick.driver.H2Driver.api._
+import ${c.slickDriver}.api._
 
 object UpdateLogic extends AbstractLogic {
   def logic(${if (c.isMatch) s"${c.entityNm}Row: ${capitalize(c.entityNm)}Row" else s"data: ${capitalize(c.actionClassId)}Data"}): Future[Int] = {
@@ -347,7 +347,7 @@ import daos.${capitalize(c.entityNm)}s
 import models.Tables.${capitalize(c.entityNm)}Row
 import forms.${c.pkgNm}.${capitalize(c.actionClassId)}Data
 import scala.concurrent.Future
-import slick.driver.H2Driver.api._
+import ${c.slickDriver}.api._
 
 object SearchLogic extends AbstractLogic {
 
@@ -365,7 +365,7 @@ object SearchLogic extends AbstractLogic {
 import logics.common.AbstractLogic
 import daos.${capitalize(c.entityNm)}s
 import scala.concurrent.Future
-import slick.driver.H2Driver.api._
+import ${c.slickDriver}.api._
 
 object DeleteLogic extends AbstractLogic {
   def logic(${c.keys.map(p => s"${p.pname}: ${p.ptype}").mkString(" ,")}): Future[Int] = {

@@ -38,11 +38,11 @@ object GenerateController extends App with LazyLogging {
 
   val (user, password) = if (args.size > 7) (Some(args(7)), Some(args(8))) else (None, None)
 
-  generateController(jdbcDriver, url, schema, user, password)(outputDir, tablesPkg)
+  generateController(slickDriver, jdbcDriver, url, schema, user, password)(outputDir, tablesPkg)
 
   logger.info("end   GenerateController")
 
-  private def generateController(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String])(folder: String, tablesPkg: String) = {
+  private def generateController(slickDriver: String, jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String])(folder: String, tablesPkg: String) = {
 
     // 処理対象のデータリスト(ACTION_CLASS_ID/SCREEN_ID)を取得
     val actionClassIdList = Await.result(Screens.find(), Duration.Inf)
@@ -88,12 +88,12 @@ object GenerateController extends App with LazyLogging {
                 val itemIsMatch = GenUtil.isMatch(allColumns, rows)
 
                 val parm = if (screen.screenType == Some("Update"))
-                  Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rows, columns.toList, itemIsMatch)
+                  Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rows, columns.toList, itemIsMatch, slickDriver)
                 else
-                  Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rowsExcluded, columns.toList, itemIsMatch)
+                  Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rowsExcluded, columns.toList, itemIsMatch, slickDriver)
 
-                val parmExcluded = Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rowsExcluded, columns.toList, itemIsMatch)
-                val parmAll = Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rows, columns.toList, itemIsMatch)
+                val parmExcluded = Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rowsExcluded, columns.toList, itemIsMatch, slickDriver)
+                val parmAll = Controllers(pkgNm, entityNm, actionClassId, actionNms, colKeys, tablesPkg, rows, columns.toList, itemIsMatch, slickDriver)
 
                 val str = controllerTemplate(parm)
                 FileUtil.createFile(str, folder + s"/app/controllers/$pkgNm", capitalize(screen.actionClassId.get) + ".scala", overrideController)
