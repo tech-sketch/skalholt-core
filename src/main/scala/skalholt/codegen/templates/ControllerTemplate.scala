@@ -28,8 +28,9 @@ import logics.${c.entityNm.toLowerCase}.IndexLogic
 import forms.${c.pkgNm}.${capitalize(c.actionClassId)}Form
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import controllers.common.AbstractController
 
-trait Index extends Controller with ${capitalize(c.actionClassId)}Form {
+trait Index extends AbstractController with ${capitalize(c.actionClassId)}Form {
 
   def index = Action.async { implicit request =>
     IndexLogic.logic
@@ -49,8 +50,9 @@ import play.api.Play.current
 import logics.${c.entityNm.toLowerCase}.IndexLogic
 import forms.${c.pkgNm}.{ ${capitalize(c.actionClassId)}Form, ${capitalize(c.actionClassId)}Data }
 import scala.concurrent.ExecutionContext.Implicits.global
+import controllers.common.AbstractController
 
-trait Index extends Controller with ${capitalize(c.actionClassId)}Form {
+trait Index extends AbstractController with ${capitalize(c.actionClassId)}Form {
 
   def index(${c.keys.map(p => s"${p.pname}: ${p.ptype}").mkString(", ")}) = Action.async { implicit request =>
     IndexLogic.logic(${c.keys.map(p => s"${p.pname}").mkString(", ")}).map {
@@ -66,7 +68,7 @@ trait Index extends Controller with ${capitalize(c.actionClassId)}Form {
             case (r, index) => c.columns.filter(col => decapitalize(camelize(col.name)) == r.iname).headOption match {
               case Some(col) =>
                 talbe2Form(col, r, s"${c.entityNm}${
-                  if (c.rows.length <= 15) s".${r.iname}"
+                  if (c.rows.length <= 22) s".${r.iname}"
                   else s"($index)"
                 }")
               case _ =>
@@ -94,8 +96,9 @@ import logics.${c.entityNm.toLowerCase}.IndexLogic
 import forms.${c.pkgNm}.${capitalize(c.actionClassId)}Form
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import controllers.common.AbstractController
 
-trait Index extends Controller with ${capitalize(c.actionClassId)}Form {
+trait Index extends AbstractController with ${capitalize(c.actionClassId)}Form {
 
   def index = Action.async { implicit request =>
     IndexLogic.logic
@@ -109,15 +112,20 @@ trait Index extends Controller with ${capitalize(c.actionClassId)}Form {
   val indexTemplate = (c: Controllers) =>
     s"""package controllers.${c.pkgNm}.${c.actionClassId.toLowerCase}
 
-import play.api.db.slick._
+import play.api.i18n.Messages.Implicits._
 import play.api.mvc._
+import play.api.Play.current
 import logics.${c.entityNm.toLowerCase}.IndexLogic
 import forms.${c.pkgNm}.${capitalize(c.actionClassId)}Form
+import scala.concurrent.ExecutionContext.Implicits.global
+import controllers.common.AbstractController
 
-trait Index extends Controller with ${capitalize(c.actionClassId)}Form {
+trait Index extends AbstractController with ${capitalize(c.actionClassId)}Form {
 
-  def index = DBAction.transaction { implicit request =>
-    Ok(views.html.${c.pkgNm}.${c.actionClassId}(${c.actionClassId}Form))
+  def index = Action.async { implicit request =>
+    Future {
+      Ok(views.html.${c.pkgNm}.${c.actionClassId}(${c.actionClassId}Form))
+    }
   }
 }"""
 

@@ -14,25 +14,25 @@ import slick.jdbc.JdbcModelBuilder
 
 object DBUtils extends AbstractDao with LazyLogging {
 
+  def getDatabase(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String]) =
+    if (!user.isEmpty)
+      Database.forURL(url, driver = jdbcDriver, user = user.get, password = password.getOrElse(""))
+    else
+      Database.forURL(url, driver = jdbcDriver)
+
   def getTables(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String]) = {
-
-    val db =
-      if (!user.isEmpty)
-        Database.forURL(url, driver = jdbcDriver, user = user.get, password = password.getOrElse(""))
-      else
-        Database.forURL(url, driver = jdbcDriver)
-
     val tablesA = MTable.getTables(None, Some(schema), None, None)
-
-    Await.result(db.run(tablesA), Duration.Inf)
+    val gendb = getDatabase(jdbcDriver, url, schema, user, password)
+    Await.result(gendb.run(tablesA), Duration.Inf)
       .filter(_.tableType == "TABLE")
       .filter(t => !ignoreTables.exists(_.equalsIgnoreCase(t.name.name)))
   }
 
   def getModel(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String]) = {
     val tables = getTables(jdbcDriver, url, schema, user, password)
-    val modelBuilder = (new JdbcModelBuilder(tables, false)).buildModel
-    Await.result(db.run(modelBuilder), Duration.Inf)
+    val gendb = getDatabase(jdbcDriver, url, schema, user, password)
+    val modelBuilder = (new JdbcModelBuilder(tables, true)).buildModel
+    Await.result(gendb.run(modelBuilder), Duration.Inf)
   }
 
   def getTable(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String])(tableNm: String): Option[MTable] =
@@ -41,6 +41,10 @@ object DBUtils extends AbstractDao with LazyLogging {
   def getColumnLength(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String])(tableNm: String): Int =
     (getColumns(jdbcDriver, url, schema, user, password)(tableNm: String)).length
 
-  def getColumns(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String])(tableNm: String): Seq[Column] =
-    getModel(jdbcDriver, url, schema, user, password).tables.filter(t => t.name.table == StringUtil.decamelize(tableNm)).head.columns
+  def getColumns(jdbcDriver: String, url: String, schema: String, user: Option[String], password: Option[String])(tableNm: String): Seq[Column] = {
+    getModel(jdbcDriver, url, schema, user, password).tables.filter(t => t.name.table.compareToIgnoreCase(StringUtil.decamelize(tableNm)) == 0) match {
+      case m if (m.length > 0) => m.head.columns
+      case _ => Seq.empty[Column]
+    }
+  }
 }
