@@ -17,15 +17,6 @@ The code generator for Play Framework and Slick.
 ‐ Can edit the application structures in the repository.
 ‐ Don't have to install , because provided by  "Typesafe Activator".
 
-# Contact
-
-Please send feedback to us.
-
-[TIS Inc.](http://www.tis.com/)
-System Development Technology R&D Office
-Skalholt team
-<smart_dev@ml.tis.co.jp>.
-
 # License
 
 Skalholt is released under the Apache License version2.0.
